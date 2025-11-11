@@ -27,12 +27,6 @@ class ProfileUpdateRequest extends FormRequest
             'state' => ['nullable', 'string', 'max:100'],
             'zip' => ['nullable', 'string', 'max:20'],
             'address' => ['nullable', 'string', 'max:500'],
-            'social_security_id' => ['nullable', 'string', 'max:50'],
-            'taxpayer_id' => ['nullable', 'string', 'max:50'],
-            'health_insurance_id' => ['nullable', 'string', 'max:50'],
-            'savings_id' => ['nullable', 'string', 'max:50'],
-            'bank_name' => ['nullable', 'string', 'max:100'],
-            'bank_account_number' => ['nullable', 'string', 'max:50'],
             'profile_picture' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg'],
         ];
     }

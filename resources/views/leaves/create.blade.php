@@ -5,10 +5,10 @@
                 <header class="flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                            {{ __('Create Leave') }}
+                            Create Leave
                         </h2>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            {{ __("Make a leave request.") }}
+                            Make a leave request.
                         </p>
                     </div>
                 </header>
@@ -61,7 +61,7 @@
                     </div>
 
                     <div class="flex items-center gap-4">
-                        <x-primary-button>{{ __('Create') }}</x-primary-button>
+                        <x-primary-button>Create</x-primary-button>
                         @if (session('create_success'))
                         <p class="text-sm text-green-600 dark:text-green-400">{{ session('create_success') }}</p>
                         @endif

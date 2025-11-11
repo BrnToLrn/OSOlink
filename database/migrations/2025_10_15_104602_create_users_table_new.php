@@ -20,7 +20,6 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('job_type');
-            $table->string('employment_status');
             $table->string('hourly_rate');
             $table->enum('gender', ['Male', 'Female', 'Other', 'Prefer not to say'])->nullable();
             $table->string('phone')->nullable();
@@ -29,10 +28,6 @@ return new class extends Migration
             $table->string('state')->nullable();
             $table->string('zip')->nullable();
             $table->text('address')->nullable();
-            $table->string('social_security_id')->nullable();
-            $table->string('taxpayer_id')->nullable();
-            $table->string('health_insurance_id')->nullable();
-            $table->string('savings_id')->nullable();
             $table->string('bank_name')->nullable();
             $table->string('bank_account_number')->nullable();
             $table->string('profile_picture')->nullable();

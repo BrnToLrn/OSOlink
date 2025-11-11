@@ -2,10 +2,10 @@
     <header class="flex items-center justify-between">
         <div>
             <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                {{ __('Manage Personal Leaves') }}
+                Manage Personal Leaves
             </h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                {{ __("Make, view, and search your own leaves.") }}
+                Make, view, and search your own leaves.
             </p>
         </div>
         <div class="flex items-center gap-4">
@@ -41,19 +41,26 @@
                 @forelse ($leaves as $leave)
                     <tr>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ $leave->type }}</td>
-                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ \Carbon\Carbon::parse($leave->start_date)->format('Y-m-d') }}</td>
-                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ \Carbon\Carbon::parse($leave->end_date)->format('Y-m-d') }}</td>
+
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            @php $status = $leave->status ?? 'Pending'; @endphp
-                            <span class="
-                                @if(strtolower($status) === 'approved') text-green-600 dark:text-green-400
-                                @elseif(strtolower($status) === 'rejected') text-red-600 dark:text-red-600
-                                @else text-yellow-600 dark:text-yellow-400
-                                @endif
-                            ">
-                                {{ ucfirst($status) }}
-                            </span>
+                            {{ $leave->start_date ? \Carbon\Carbon::parse($leave->start_date)->format('F j, Y') : 'N/A' }}
                         </td>
+
+                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
+                            {{ $leave->end_date ? \Carbon\Carbon::parse($leave->end_date)->format('F j, Y') : 'N/A' }}
+                        </td>
+
+                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
+                            @php
+                                $status = $leave->status ?? 'Pending';
+                                $s = strtolower($status);
+                                $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
+                                             : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
+                                             : 'text-yellow-600 dark:text-yellow-400');
+                            @endphp
+                            <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
+                        </td>
+                        
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             <a href="{{ route('leaves.edit', $leave) }}" class="text-green-600 dark:text-green-400 hover:underline">Edit</a>
                             <form action="{{ route('leaves.destroy', $leave) }}" method="POST" style="display:inline;">

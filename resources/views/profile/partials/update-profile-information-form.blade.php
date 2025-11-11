@@ -1,11 +1,11 @@
 <section>
     <header>
         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-            {{ __('Profile Information') }}
+            Profile Information
         </h2>
 
         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {{ __("Update your account's profile information and email address.") }}
+            Update your account's profile information and email address.
         </p>
     </header>
 
@@ -26,13 +26,13 @@
             @csrf
             <input type="file" name="profile_picture" accept="image/*" required class="mb-2 text-white">
             <div class="flex gap-2">
-                <x-primary-button>{{ __('Upload') }}</x-primary-button>
+                <x-primary-button>Upload</x-primary-button>
             </form>
                 @if(auth()->user()->profile_picture)
                     <form method="POST" action="{{ route('profile.remove') }}">
                         @csrf
                         @method('DELETE')
-                        <x-danger-button>{{ __('Remove') }}</x-danger-button>
+                        <x-danger-button>Remove</x-danger-button>
                     </form>
                 @endif
             </div>
@@ -76,16 +76,16 @@
                 @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                     <div>
                         <p class="text-sm mt-2 text-gray-800 dark:text-gray-200">
-                            {{ __('Your email address is unverified.') }}
+                            Your email address is unverified.
 
                             <button form="send-verification" class="underline text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800">
-                                {{ __('Click here to re-send the verification email.') }}
+                                Click here to re-send the verification email.
                             </button>
                         </p>
 
                         @if (session('status') === 'verification-link-sent')
                             <p class="mt-2 font-medium text-sm text-green-600 dark:text-green-400">
-                                {{ __('A new verification link has been sent to your email address.') }}
+                                A new verification link has been sent to your email address.
                             </p>
                         @endif
                     </div>
@@ -163,54 +163,34 @@
         </div>
 
         <div class="flex items-center gap-4 mt-4">
-            <!-- Social Security ID -->
-            <div class="flex-1">
-                <x-input-label for="social_security_id" :value="__('Social Security ID')" />
-                <x-text-input id="social_security_id" name="social_security_id" type="text" class="mt-1 block w-full" :value="old('social_security_id', $user->social_security_id)" autocomplete="social_security_id" />
-                <x-input-error class="mt-2" :messages="$errors->get('social_security_id')" />
-            </div>
-
-            <!-- Taxpayer ID -->
-            <div class="flex-1">
-                <x-input-label for="taxpayer_id" :value="__('Taxpayer ID')" />
-                <x-text-input id="taxpayer_id" name="taxpayer_id" type="text" class="mt-1 block w-full" :value="old('taxpayer_id', $user->taxpayer_id)" autocomplete="taxpayer_id" />
-                <x-input-error class="mt-2" :messages="$errors->get('taxpayer_id')" />
-            </div>
-
-            <!-- Health Insurance ID -->
-            <div class="flex-1">
-                <x-input-label for="health_insurance_id" :value="__('Healthcare Insurance ID')" />
-                <x-text-input id="health_insurance_id" name="health_insurance_id" type="text" class="mt-1 block w-full" :value="old('health_insurance_id', $user->health_insurance_id)" autocomplete="health_insurance_id" />
-                <x-input-error class="mt-2" :messages="$errors->get('health_insurance_id')" />
-            </div>
-        </div>
-
-        <div class="flex items-center gap-4 mt-4">
-            <!-- Housing/Savings ID -->
-            <div class="flex-1">
-                <x-input-label for="savings_id" :value="__('Housing/Savings ID')" />
-                <x-text-input id="savings_id" name="savings_id" type="text" class="mt-1 block w-full" :value="old('savings_id', $user->savings_id)" autocomplete="savings_id" />
-                <x-input-error class="mt-2" :messages="$errors->get('savings_id')" />
-            </div>
-
             <!-- Bank Name -->
             <div class="flex-1">
                 <x-input-label for="bank_name" :value="__('Bank Name')" />
-                <x-text-input id="bank_name" name="bank_name" type="text" class="mt-1 block w-full" :value="old('bank_name', $user->bank_name)" autocomplete="bank_name" />
-                <x-input-error class="mt-2" :messages="$errors->get('bank_name')" />
+                <x-text-input id="bank_name" name="bank_name" type="text" class="mt-1 block w-full cursor-not-allowed opacity-75" :value="old('bank_name', $user->bank_name)" autocomplete="bank_name" disabled />
             </div>
 
             <!-- Bank Account Number -->
             <div class="flex-1">
                 <x-input-label for="bank_account_number" :value="__('Bank Account Number')" />
-                <x-text-input id="bank_account_number" name="bank_account_number" type="text" class="mt-1 block w-full" :value="old('bank_account_number', $user->bank_account_number)" autocomplete="bank_account_number" />
-                <x-input-error class="mt-2" :messages="$errors->get('bank_account_number')" />
+                <x-text-input id="bank_account_number" name="bank_account_number" type="text" class="mt-1 block w-full cursor-not-allowed opacity-75" :value="old('bank_account_number', $user->bank_account_number)" autocomplete="bank_account_number" disabled />
+            </div>
+
+            <!-- Job Type -->
+            <div class="flex-1">
+                <x-input-label for="job_type" :value="__('Job Type')" />
+                <x-text-input id="job_type" name="job_type" type="text" class="mt-1 block w-full cursor-not-allowed opacity-75" :value="$user->job_type" disabled />
+            </div>
+
+            <!-- Hourly Rate -->
+            <div class="flex-1">
+                <x-input-label for="hourly_rate" :value="__('Hourly Rate')" />
+                <x-text-input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" class="mt-1 block w-full cursor-not-allowed opacity-75" :value="$user->hourly_rate" disabled />
             </div>
         </div>
 
         <!-- Save -->
         <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
+            <x-primary-button>Save</x-primary-button>
             @if (session('update_success'))
                <p class="text-sm text-green-600 dark:text-green-400">{{ session('update_success') }}</p>
             @elseif (session('create_success'))
