@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->decimal('hours_worked', 8, 2);
             $table->decimal('hourly_rate', 10, 2);
             $table->decimal('gross_pay', 10, 2);
+            $table->decimal('adjustments', 10, 2)->default(0);
             $table->decimal('net_pay', 10, 2);
             $table->timestamps();
         });

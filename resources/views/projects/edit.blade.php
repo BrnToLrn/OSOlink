@@ -5,10 +5,10 @@
                 <header class="flex items-start justify-between">
                     <div>
                         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                            {{ __('Edit Project') }}
+                            Edit Project
                         </h2>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            {{ __("Edit an existing project for employees to collaborate on.") }}
+                            Edit an existing project for employees to collaborate on.
                         </p>
                 </header>
                 <form method="POST" action="{{ route('projects.update', $project->id) }}" class="mt-6 space-y-6">
