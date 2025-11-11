@@ -164,7 +164,6 @@
                         View the user's hourly rate changes.
                     </p>
                 </header>
-                <!-- ADD HERE -->
                 @if (isset($rateHistory) && $rateHistory->count())
                     <div class="mt-4 overflow-x-auto">
                         <table class="rounded-lg overflow-hidden w-full divide-y divide-gray-300 dark:divide-gray-700">

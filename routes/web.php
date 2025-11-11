@@ -74,6 +74,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/payslip/calc-hours', [PayslipController::class, 'calculateHours'])->name('payslip.calculateHours');
     });
 
+    //Payroll
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('payrolls/create', [\App\Http\Controllers\PayrollController::class, 'create'])->name('payrolls.create');
+        Route::post('payrolls/generate', [\App\Http\Controllers\PayrollController::class, 'generate'])->name('payrolls.generate');
+    });
+
     // Leaves
     Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
     // Leaves Admin actions

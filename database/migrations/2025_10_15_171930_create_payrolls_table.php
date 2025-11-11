@@ -9,7 +9,13 @@ return new class extends Migration {
     {
         if (!Schema::hasTable('payrolls')) {
             Schema::create('payrolls', function (Blueprint $table) {
-                
+                $table->id();
+                $table->date('period_from');
+                $table->date('period_to');
+                $table->date('pay_date');
+                $table->decimal('total_amount', 15, 2);
+                $table->datetime('created_at')->useCurrent();
+                $table->timestamps();
             });
         }
     }
