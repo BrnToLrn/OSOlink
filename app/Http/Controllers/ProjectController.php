@@ -9,6 +9,8 @@ use App\Models\Comment;
 use App\Models\TimeLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
+use Illuminate\Validation\Rule; // Import the Rule class
 
 class ProjectController extends Controller
 {
@@ -19,14 +21,12 @@ class ProjectController extends Controller
 
         // Only show assigned projects for non-admins
         if (!auth()->user()->is_admin) {
-            $query->whereHas('users', function ($q) {
-                $q->where('users.id', auth()->id());
-            });
+            $query->whereHas('users', fn($q) => $q->where('users.id', auth()->id()));
         }
 
         // Search by name
         if ($request->filled('search')) {
-            $query->where('name', 'ILIKE', '%' . $request->search . '%');
+            $query->where('name', 'like', '%' . $request->search . '%'); // DB agnostic
         }
 
         // Filter by status
@@ -65,7 +65,6 @@ class ProjectController extends Controller
             'project_lead_id' => [
                 'nullable',
                 'exists:users,id',
-                // This ensures the lead is also in the selected users list
                 function ($attribute, $value, $fail) use ($request) {
                     if ($value && $request->has('user_ids') && !in_array($value, $request->user_ids)) {
                         $fail('The project lead must be one of the assigned users.');
@@ -75,26 +74,19 @@ class ProjectController extends Controller
         ]);
 
         $validated['created_by'] = auth()->id();
-
         $project = Project::create($validated);
 
-        // Attach users with their roles
+        // Attach users with roles
         if ($request->has('user_ids')) {
             $projectLeadId = $request->project_lead_id;
-
-            // Prepare the data for the project_users pivot table
             $usersToAttach = [];
             foreach ($request->user_ids as $userId) {
-                // We add the `project_role` to the pivot table data
                 $usersToAttach[$userId] = [
                     'project_role' => ($userId == $projectLeadId) ? 'Project Lead' : 'Developer'
                 ];
             }
-
-            // Attach all users and their roles in a single database query
             $project->users()->attach($usersToAttach);
         }
-
 
         return redirect()->route('projects.show', $project)->with('success', 'Project created successfully!');
     }
@@ -107,44 +99,60 @@ class ProjectController extends Controller
         if ($user->is_admin || 
             $project->status === 'Completed' ||
             !$project->users()->exists() ||
-            $project->users->contains($user->id)
+            $project->users()->where('users.id', $user->id)->exists()
         ) {
             $project->load([
                 'users',
-                'timeLogs.user',
+                'timeLogs.user', // Eager load the user for each time log
                 'comments.user',
                 'comments.replies.user',
                 'permissions.user',
                 'creator'
             ]);
 
-            // Precompute selected users for AlpineJS
-            $selectedUsers = $project->users->map(function($u) {
-                return [
-                    'id' => $u->id,
-                    'first_name' => $u->first_name,
-                    'middle_name' => $u->middle_name,
-                    'last_name' => $u->last_name,
-                    'email' => $u->email,
-                    'project_role' => $u->pivot->project_role,
-                ];
-            })->toArray();
+            $selectedUsers = $project->users->map(fn($u) => [
+                'id' => $u->id,
+                'first_name' => $u->first_name,
+                'middle_name' => $u->middle_name,
+                'last_name' => $u->last_name,
+                'email' => $u->email,
+                'project_role' => $u->pivot->project_role,
+            ])->toArray();
 
-            // Find project lead id
             $projectLeadId = optional($project->users->firstWhere('pivot.project_role', 'Project Lead'))->id;
 
-            // Get all active users not already assigned
             $allUsers = User::where('is_active', true)
-                ->whereNotIn('id', $project->users->pluck('id'))
-                ->get();
+                ->get(); // We load all users, Alpine will handle filtering already-added ones
+            
+            // **NEW LOGIC**
+            // 1. Group logs by their formatted date.
+            // 2. Map over the *logs* inside each group to include user data.
+            $timeLogs = $project->timeLogs->groupBy(function ($log) {
+                return $log->date->format('Y-m-d');
+            })->map(function ($logsOnDate) {
+                // Map each log in the group to the format Alpine needs
+                return $logsOnDate->map(function ($log) {
+                    return [
+                        'id' => $log->id,
+                        'status' => $log->status,
+                        'time_in' => $log->time_in,
+                        'time_out' => $log->time_out,
+                        'work_output' => $log->work_output,
+                        'hours' => $log->hours,
+                        'decline_reason' => $log->decline_reason,
+                        'user_id' => $log->user_id,
+                        'user_name' => $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'Unknown User',
+                        // We can add this for the edit/delete/approve policy
+                        'can_manage' => auth()->user()->is_admin || auth()->id() === $log->user_id
+                    ];
+                });
+            })->toArray(); // Convert the final structure to an array for JSON
 
-            // Pass everything to the view
-            return view('projects.show', compact('project', 'allUsers', 'selectedUsers', 'projectLeadId'));
+            return view('projects.show', compact('project', 'allUsers', 'selectedUsers', 'projectLeadId', 'timeLogs'));
         }
 
         abort(403, 'You do not have access to this project.');
     }
-
 
     // Edit project
     public function edit(Project $project)
@@ -153,49 +161,38 @@ class ProjectController extends Controller
         return view('projects.edit', compact('project', 'users'));
     }
 
-    // Update project
+    // Update project (Handles both Edit form and Manage Team modal)
     public function update(Request $request, Project $project)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'status' => 'required|in:Not Started,In Progress,On Hold,Completed',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'user_ids' => 'nullable|array',
-            'user_ids.*' => 'exists:users,id',
-            'project_lead_id' => [
-                'nullable',
-                'exists:users,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    if ($value && $request->has('user_ids') && !in_array($value, $request->user_ids)) {
-                        $fail('The project lead must be one of the assigned users.');
-                    }
-                },
-            ],
-        ]);
-
-        $project->update($validated);
-
-        if ($request->has('user_ids')) {
-            $projectLeadId = $request->project_lead_id;
-
-            $usersToSync = [];
-            foreach ($request->user_ids as $userId) {
-                $usersToSync[$userId] = [
-                    'project_role' => ($userId == $projectLeadId) ? 'Project Lead' : 'Developer'
-                ];
-            }
-            // `sync` is correct for updates: it adds new users, removes
-            // ones that were unchecked, and updates roles for existing ones.
-            $project->users()->sync($usersToSync);
-        } else {
-            // If no users were sent, detach all of them.
-            $project->users()->detach();
+        // 1. Handle "Edit Project" form data
+        if ($request->has('name')) {
+            $data = $request->validate([
+                'name' => 'required|string',
+                'description' => 'nullable|string',
+                'status' => 'required|string',
+                'start_date' => 'required|date',
+                'end_date' => 'required|date|after_or_equal:start_date',
+            ]);
+            $project->update($data);
         }
 
-        return redirect()->route('projects.show', $project->id)
-            ->with('success', 'Project updated successfully.');
+        // 2. Handle "Manage Team" modal data
+        if ($request->has('user_ids')) {
+            $userIds = $request->input('user_ids', []);
+            $leadId = $request->input('project_lead_id');
+
+            $sync = [];
+            foreach ($userIds as $uid) {
+                $sync[$uid] = [
+                    'project_role' => ($leadId && (string)$uid === (string)$leadId)
+                        ? 'Project Lead'
+                        : 'Developer',
+                ];
+            }
+            $project->users()->sync($sync);
+        }
+
+        return redirect()->route('projects.show', $project)->with('success', 'Project updated.');
     }
 
     // Delete project
@@ -205,62 +202,7 @@ class ProjectController extends Controller
         return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
     }
 
-    // Assign/remove users
-    public function addUser(Request $request, Project $project)
-    {
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'project_role' => 'required|string'
-        ]);
-
-        // Prevent duplicates
-        if ($project->users->contains($request->user_id)) {
-            return back()->with('error', 'User already in project.');
-        }
-
-        $project->users()->attach($request->user_id, ['project_role' => $request->project_role]);
-        return back()->with('success', 'User added successfully.');
-    }
-
-    public function updateUserRole(Request $request, Project $project, User $user)
-    {
-        $request->validate([
-            'project_role' => 'required|string'
-        ]);
-
-        // Check if user is part of the project
-        if (!$project->users->contains($user->id)) {
-            return back()->with('error', 'User not part of the project.');
-        }
-
-        // Update pivot table
-        $project->users()->updateExistingPivot($user->id, ['project_role' => $request->project_role]);
-        return back()->with('success', 'User role updated successfully.');
-    }
-
-    public function removeUser(Project $project, User $user)
-    {
-        $project->users()->detach($user->id);
-        return back()->with('success', 'User removed.');
-    }
-
-    // Permissions
-    public function setPermission(Request $request, Project $project)
-    {
-        $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'role' => 'required|in:Viewer,Contributor,Manager',
-        ]);
-
-        ProjectPermission::updateOrCreate(
-            ['project_id' => $project->id, 'user_id' => $validated['user_id']],
-            ['role' => $validated['role']]
-        );
-
-        return back()->with('success', 'Permission updated.');
-    }
-
-    // Comments (allowed even if Completed)
+    // Comments
     public function addComment(Request $request, Project $project)
     {
         $validated = $request->validate([
@@ -277,96 +219,166 @@ class ProjectController extends Controller
         return back()->with('success', 'Comment added.');
     }
 
-    // Add time log
+    // --- TIME LOGS ---
+
+    private function hasOverlappingTimeLog(Request $request, $projectId, $userId, $exceptLogId = null)
+    {
+        $start = Carbon::createFromFormat('Y-m-d H:i', $request->date . ' ' . $request->time_in);
+        $end = Carbon::createFromFormat('Y-m-d H:i', $request->date . ' ' . $request->time_out);
+        if ($end->lessThanOrEqualTo($start)) {
+            $end->addDay();
+        }
+
+        $query = TimeLog::where('project_id', $projectId)
+            ->where('user_id', $userId)
+            ->where('date', $request->date)
+            ->when($exceptLogId, fn($q) => $q->where('id', '!=', $exceptLogId))
+            ->where(function ($q) use ($start, $end) {
+                $q->where(function($q2) use ($start, $end) {
+                    $q2->where('time_in', '>=', $start->format('H:i'))
+                    ->where('time_in', '<', $end->format('H:i'));
+                })->orWhere(function($q2) use ($start, $end) {
+                    $q2->where('time_out', '>', $start->format('H:i'))
+                    ->where('time_out', '<=', $end->format('H:i'));
+                })->orWhere(function($q2) use ($start, $end) {
+                    $q2->where('time_in', '<', $start->format('H:i'))
+                    ->where('time_out', '>', $end->format('H:i'));
+                });
+            });
+
+        if ($query->exists()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'errors' => ['time_in' => ['There is a conflict with an existing time log for this day. Please check your entries.']]
+                ], 422);
+            }
+
+            return back()
+                ->withErrors(['time_in' => 'There is a conflict with an existing time log for this day. Please check your entries.'])
+                ->with('section', 'timelogs');
+        }
+
+        return false; // No overlap
+    }
+
     public function addTimeLog(Request $request, Project $project)
     {
         $validated = $request->validate([
-            'hours' => 'required|numeric|min:0.1',
+            'date' => ['required', 'date', 'after_or_equal:' . $project->start_date, 'before_or_equal:' . $project->end_date],
+            'time_in' => 'required|date_format:H:i',
+            'time_out' => 'required|date_format:H:i',
             'work_output' => 'required|string|max:2000',
-            'date' => [
-                'required',
-                'date',
-                'after_or_equal:' . $project->start_date,
-                'before_or_equal:' . $project->end_date,
-            ],
         ]);
 
-        $project->timeLogs()->create([
+        $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, auth()->id());
+        if ($overlapResponse) {
+            return $overlapResponse; // Returns JSON or back()
+        }
+
+        $start = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_in']);
+        $end   = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_out']);
+
+        if ($end->lessThanOrEqualTo($start)) {
+            $end->addDay(); // handles overnight work (e.g., 11pm–2am)
+        }
+
+        $minutes = $start->diffInMinutes($end);
+        $hours = round($minutes / 60, 2);
+
+        $timeLog = $project->timeLogs()->create([
             'user_id' => Auth::id(),
-            'hours' => $validated['hours'],
-            'work_output' => $validated['work_output'],
             'date' => $validated['date'],
+            'time_in' => $validated['time_in'],
+            'time_out' => $validated['time_out'],
+            'hours' => $hours,
+            'work_output' => $validated['work_output'],
+            'status' => 'Pending',
         ]);
 
-        return back()->with('success', 'Time log added.');
-    }
-
-    // Join project
-    public function join(Project $project)
-    {
-        $user = auth()->user();
-
-        if ($project->users->contains($user->id)) {
-            return back()->with('error', 'You are already in this project.');
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Time log created successfully',
+                'log' => $timeLog
+            ]);
         }
 
-        if ($project->status === 'Completed') {
-            return back()->with('error', 'Cannot join a completed project.');
-        }
-
-        $project->users()->attach($user->id);
-        return back()->with('success', 'You joined the project.');
+        return back()->with('success', 'Time log created successfully');
     }
 
-    // Leave project
-    public function leave(Project $project)
-    {
-        $user = auth()->user();
-
-        if (!$project->users->contains($user->id)) {
-            return back()->with('error', 'You are not part of this project.');
-        }
-
-        $project->users()->detach($user->id);
-        return back()->with('success', 'You left the project.');
-    }
-
-    // Edit time log (show form)
-    public function editTimeLog(Project $project, TimeLog $timeLog)
-    {
-        $user = auth()->user();
-        if (!$user->is_admin && $timeLog->user_id !== $user->id) {
-            abort(403, 'Unauthorized');
-        }
-        return view('projects.edit-timelog', compact('project', 'timeLog'));
-    }
-
-    // Update time log
     public function updateTimeLog(Request $request, Project $project, TimeLog $timeLog)
     {
         $user = auth()->user();
-        if (!$user->is_admin && $timeLog->user_id !== $user->id) {
-            abort(403, 'Unauthorized');
-        }
+        if (!$user->is_admin && $timeLog->user_id !== $user->id) abort(403);
 
         $validated = $request->validate([
-            'hours' => 'required|numeric|min:0.1',
+            'date' => ['required', 'date', 'after_or_equal:' . $project->start_date, 'before_or_equal:' . $project->end_date],
+            'time_in' => 'required|date_format:H:i',
+            'time_out' => 'required|date_format:H:i',
             'work_output' => 'required|string|max:2000',
-            'date' => [
-                'required',
-                'date',
-                'after_or_equal:' . $project->start_date,
-                'before_or_equal:' . $project->end_date,
-            ],
         ]);
 
-        $timeLog->update($validated);
+        $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, $timeLog->user_id, $timeLog->id);
+        if ($overlapResponse) {
+            return $overlapResponse;
+        }
 
-        return redirect()->route('projects.show', [$project->id, 'section' => 'timelogs'])
-            ->with('success', 'Time log updated.');
+        $start = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_in']);
+        $end   = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_out']);
+        if ($end->lessThanOrEqualTo($start)) $end->addDay();
+
+        $hours = round($start->diffInMinutes($end) / 60, 2);
+
+        $timeLog->update([
+            'date' => $validated['date'],
+            'time_in' => $validated['time_in'],
+            'time_out' => $validated['time_out'],
+            'hours' => $hours,
+            'work_output' => $validated['work_output'],
+            'status' => 'Pending',
+            'decline_reason' => null,
+        ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Time log updated successfully',
+                'log' => $timeLog
+            ]);
+        }
+
+        return redirect()
+            ->route('projects.show', ['project' => $project->id, 'section' => 'timelogs'])
+            ->with('success', 'Time log updated and resubmitted for approval.');
     }
 
-    // Delete time log
+
+    public function approveTimeLog(Project $project, TimeLog $timeLog)
+    {
+        $user = auth()->user();
+        $leadId = optional($project->users->firstWhere('pivot.project_role', 'Project Lead'))->id;
+
+        if (!$user->is_admin && $user->id !== $leadId) {
+            abort(403, 'Only the project lead can approve time logs.');
+        }
+
+        $timeLog->approve(); // Assumes TimeLog model has approve() method
+        return back()->with('success', 'Time log approved.');
+    }
+
+    public function declineTimeLog(Request $request, Project $project, TimeLog $timeLog)
+    {
+        $user = auth()->user();
+        $leadId = optional($project->users->firstWhere('pivot.project_role', 'Project Lead'))->id;
+
+        if (!$user->is_admin && $user->id !== $leadId) {
+            abort(403, 'Only the project lead can decline time logs.');
+        }
+
+        $validated = $request->validate(['decline_reason' => 'required|string|max:500']);
+        $timeLog->decline($validated['decline_reason']); // Assumes TimeLog model has decline() method
+
+        return back()->with('success', 'Time log declined.');
+    }
+
     public function deleteTimeLog(Project $project, TimeLog $timeLog)
     {
         $user = auth()->user();
@@ -376,7 +388,37 @@ class ProjectController extends Controller
 
         $timeLog->delete();
 
-        return redirect()->route('projects.show', [$project->id, 'section' => 'timelogs'])
-            ->with('success', 'Time log deleted.');
+        return redirect()->route('projects.show', $project->id)
+            ->with('success', 'Time log deleted.')
+            ->with('section', 'timelogs');
+    }
+
+    // Join / Leave project
+    public function join(Project $project)
+    {
+        $user = auth()->user();
+
+        if ($project->users()->where('users.id', $user->id)->exists()) {
+            return back()->with('error', 'You are already in this project.');
+        }
+
+        if ($project->status === 'Completed') {
+            return back()->with('error', 'Cannot join a completed project.');
+        }
+
+        $project->users()->attach($user->id, ['project_role' => 'Developer']); // Default role
+        return back()->with('success', 'You joined the project.');
+    }
+
+    public function leave(Project $project)
+    {
+        $user = auth()->user();
+
+        if (!$project->users()->where('users.id', $user->id)->exists()) {
+            return back()->with('error', 'You are not part of this project.');
+        }
+
+        $project->users()->detach($user->id);
+        return back()->with('success', 'You left the project.');
     }
 }

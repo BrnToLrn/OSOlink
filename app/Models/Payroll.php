@@ -12,23 +12,16 @@ class Payroll extends Model
     protected $table = 'payrolls';
 
     protected $fillable = [
-        'user_id',
-        'employment_status',
-        'base_pay',
-        'hourly_rate',
-        'hours_worked',
-        'gross_pay',
-        'deductions',
-        'net_pay',
-        'status',
         'period_from',
         'period_to',
-        'tax_deduction',
+        'pay_date',
+        'total_amount',
     ];
 
     protected $casts = [
         'period_from' => 'date',
         'period_to'   => 'date',
+        'pay_date'   => 'date',
     ];
 
     public function user()

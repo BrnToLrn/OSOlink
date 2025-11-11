@@ -4,11 +4,20 @@
             <div class="p-4 sm:p-8 bg-white dark:bg-gray-800 shadow sm:rounded-lg">
 
                 <!-- Project Header -->
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+                        {{ $project->name }}
+                    </h2>
+
+                    @if(auth()->user()->is_admin)
+                        <x-secondary-button :href="route('projects.edit', $project->id)" as="a">
+                            Edit Project
+                        </x-secondary-button>
+                    @endif
+                </div>
+                
                 <div class="flex items-start justify-between mb-4">
                     <div class="space-y-4">
-                        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                            {{ $project->name }}
-                        </h2>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Status: {{ $project->status }}
                         </label>
@@ -22,24 +31,16 @@
                             Description: {{ $project->description }}
                         </label>
                     </div>
-
-                    @if(auth()->user()->is_admin)
-                        <div class="flex space-x-3 ml-6">
-                            <x-secondary-button>
-                                <a href="{{ route('projects.edit', $project->id) }}">Edit Project</a>
-                            </x-secondary-button>
-                        </div>
-                    @endif
                 </div>
 
-                <!-- Assigned Users -->
+                <!-- Assigned Users & Modal -->
                 <div 
                     x-data="{
                         showModal: false,
                         searchTerm: '',
                         showDropdown: false,
-                        selectedUsers: {{ json_encode($selectedUsers, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT) }},
-                        projectLeadId: {{ $projectLeadId ?? 'null' }},
+                        selectedUsers: {{ json_encode($project->users, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT) }},
+                        projectLeadId: {{ $project->users->firstWhere('pivot.project_role', 'Project Lead')?->id ?? 'null' }},
                         allUsers: {{ json_encode($allUsers, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT) }},
                         get filteredUsers() {
                             return this.allUsers.filter(user =>
@@ -58,7 +59,7 @@
                             this.selectedUsers = this.selectedUsers.filter(u => u.id !== userId);
                             if (this.projectLeadId === userId) this.projectLeadId = null;
                         }
-                    }" 
+                    }"
                     class="space-y-6"
                 >
 
@@ -71,50 +72,44 @@
                     </div>
 
                     <ul class="space-y-2 mb-4">
-                        @foreach($project->users as $user)
+                        @forelse($project->users as $user)
                             <li class="border-gray-300 dark:border-gray-700 border rounded-md p-3 dark:bg-gray-900 dark:text-gray-300">
                                 <div class="font-medium">{{ $user->first_name }} {{ $user->middle_name }} {{ $user->last_name }}</div>
-                                <div class="text-sm text-gray-500">{{ $user->email }} | {{ $user->pivot->project_role ?? 'Member' }}</div>
+                                <div class="text-sm text-gray-500">{{ $user->email }} | <span class="font-semibold">{{ $user->pivot->project_role ?? 'Member' }}</span></div>
                             </li>
-                        @endforeach
+                        @empty
+                             <li class="text-gray-500 dark:text-gray-400">No users are assigned to this project yet.</li>
+                        @endforelse
                     </ul>
 
                     <!-- Manage Team Modal -->
-                    <div
+                    <div 
                         x-show="showModal"
                         x-transition
                         @keydown.escape.window="showModal = false"
-                        style="display: none;"
+                        x-cloak
                         class="fixed inset-0 z-50 flex items-center justify-center p-4"
                     >
                         <!-- Overlay -->
                         <div 
-                            x-show="showModal"
-                            x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0"
-                            x-transition:enter-end="opacity-100"
-                            x-transition:leave="ease-in duration-200"
-                            x-transition:leave-start="opacity-100"
-                            x-transition:leave-end="opacity-0"
                             class="fixed inset-0 bg-black bg-opacity-50"
                             @click="showModal = false"
                         ></div>
 
                         <!-- Modal content -->
                         <div
-                            x-show="showModal"
-                            x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave="ease-in duration-200"
-                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                             class="relative w-full max-w-3xl bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden z-50"
                             @click.outside="showModal = false"
                         >
                             <form method="POST" action="{{ route('projects.update', $project->id) }}">
                                 @csrf
                                 @method('PUT')
+
+                                <!-- Hidden inputs (so they always submit) -->
+                                <template x-for="user in selectedUsers" :key="user.id">
+                                    <input type="hidden" name="user_ids[]" x-bind:value="user.id">
+                                </template>
+                                <input type="hidden" name="project_lead_id" x-bind:value="projectLeadId">
 
                                 <!-- Modal Header -->
                                 <div class="flex items-center justify-between p-4 border-b dark:border-gray-700">
@@ -130,7 +125,7 @@
 
                                 <!-- Modal Body -->
                                 <div class="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
-                                    <!-- Search and Add -->
+                                    <!-- Search box -->
                                     <div>
                                         <x-input-label :value="__('Add Team Member')" />
                                         <div class="relative">
@@ -145,7 +140,7 @@
                                             <div
                                                 x-show="showDropdown && filteredUsers.length > 0"
                                                 x-cloak
-                                                class="absolute top-full left-0 right-0 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg z-10 max-h-64 overflow-y-auto"
+                                                class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg z-10 max-h-64 overflow-y-auto"
                                             >
                                                 <template x-for="user in filteredUsers" :key="user.id">
                                                     <button 
@@ -157,32 +152,26 @@
                                                         <div class="text-sm text-gray-500 dark:text-gray-400" x-text="user.email"></div>
                                                     </button>
                                                 </template>
-                                                <div x-show="filteredUsers.length === 0" class="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm">
-                                                    No users found
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Project Team List -->
+                                    <!-- Team list -->
                                     <div x-show="selectedUsers.length > 0" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                         <p class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Project Team:</p>
                                         <div class="space-y-3 max-h-60 overflow-y-auto">
                                             <template x-for="user in selectedUsers" :key="user.id">
                                                 <div class="flex items-center justify-between bg-white dark:bg-gray-700 p-3 rounded border border-gray-200 dark:border-gray-600">
-                                                    <!-- User Info -->
                                                     <div class="flex-1">
                                                         <p class="font-medium text-gray-900 dark:text-gray-100" x-text="user.first_name + ' ' + user.last_name"></p>
                                                         <p class="text-xs text-gray-500 dark:text-gray-400" x-text="user.email"></p>
                                                     </div>
-                                                    <!-- Radio Button for Project Lead -->
                                                     <div class="flex items-center mx-4">
                                                         <input type="radio" :id="'lead_' + user.id" :value="user.id" x-model.number="projectLeadId" class="rounded dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                                                         <label :for="'lead_' + user.id" class="ms-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                                             Lead
                                                         </label>
                                                     </div>
-                                                    <!-- Remove Button -->
                                                     <button type="button" @click="removeUser(user.id)" class="px-3 py-1 text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 rounded transition">
                                                         Remove
                                                     </button>
@@ -192,13 +181,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Hidden inputs for form submission -->
-                                <template x-for="user in selectedUsers" :key="user.id">
-                                    <input type="hidden" name="user_ids[]" :value="user.id" />
-                                </template>
-                                <input type="hidden" name="project_lead_id" x-model="projectLeadId" />
-
-                                <!-- Modal Footer -->
+                                <!-- Footer -->
                                 <div class="flex items-center justify-end p-4 bg-gray-50 dark:bg-gray-700/50 border-t dark:border-gray-700">
                                     <x-secondary-button type="button" @click="showModal = false">
                                         Cancel
@@ -210,16 +193,23 @@
                             </form>
                         </div>
                     </div>
-                </div>
-
+                </div> <!-- End of x-data div -->
 
                 <!-- Comments & Time Logs -->
-                <div x-data="{ section: '{{ request('section', request('edit_timelog') ? 'timelogs' : 'comments') }}' }">
+                <div x-data="{ section: '{{ request('section', 'comments') }}' }" class="mt-6">
                     <!-- Toggle Buttons -->
                     <div class="flex gap-4 mb-6">
-                        <button x-on:click="section = 'comments'" class="px-4 py-2 rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none" :class="section==='comments'?'bg-indigo-600 text-white hover:bg-indigo-700':'bg-gray-600 text-white hover:bg-gray-700'">Comments</button>
-                        <button x-on:click="section = 'timelogs'" class="px-4 py-2 rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none" :class="section==='timelogs'?'bg-indigo-600 text-white hover:bg-indigo-700':'bg-gray-600 text-white hover:bg-gray-700'">Time Logs</button>
+                        <button x-on:click="section = 'comments'" 
+                                class="px-4 py-2 rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none"
+                                :class="section==='comments'?'bg-indigo-600 text-white hover:bg-indigo-700':'bg-gray-600 text-white hover:bg-gray-700'">Comments</button>
+                        
+                        <button x-on:click="section = 'timelogs'" 
+                                class="px-4 py-2 rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none"
+                                :class="section==='timelogs'?'bg-indigo-600 text-white hover:bg-indigo-700':'bg-gray-600 text-white hover:bg-gray-700'">Time Logs</button>
+
+                        <!-- The "Approvals" tab is GONE. It's now part of the Time Log modal. -->
                     </div>
+
 
                     <!-- Comments Section -->
                     <div x-show="section === 'comments'">
@@ -253,7 +243,7 @@
                                     </form>
                                 </div>
                             @empty
-                                <p class="text-gray-500">No comments yet.</p>
+                                <p class="text-gray-500 dark:text-gray-400">No comments yet.</p>
                             @endforelse
                         </div>
                         <form method="POST" action="{{ route('projects.comments.store', $project->id) }}" class="mt-4">
@@ -270,64 +260,398 @@
                     <!-- Time Logs Section -->
                     <div x-show="section === 'timelogs'">
                         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Time Logs</h2>
-                        <div class="space-y-4">
-                            @foreach($project->timeLogs->sortByDesc('date') as $timeLog)
-                                <div class="border-gray-300 dark:border-gray-700 border rounded-md p-4 dark:bg-gray-900 dark:text-gray-300">
-                                    @if(request('edit_timelog') == $timeLog->id)
-                                        <form method="POST" action="{{ route('projects.updateTimeLog', [$project->id, $timeLog->id]) }}">
-                                            @csrf
-                                            @method('PUT')
-                                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                                <input type="number" name="hours" value="{{ old('hours', $timeLog->hours) }}" step="0.1" required class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm">
-                                                <input type="date" name="date" value="{{ old('date', $timeLog->date) }}" min="{{ $project->start_date }}" max="{{ $project->end_date }}" required class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm">
-                                                <textarea name="work_output" required class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm sm:col-span-3">{{ old('work_output', $timeLog->work_output) }}</textarea>
+                        
+                        <div x-data="timeLogCalendar({
+                                timeLogs: {{ json_encode($timeLogs) }},
+                                currentUserId: {{ auth()->id() }},
+                                isProjectLead: {{ auth()->user()->is_admin || auth()->id() === $projectLeadId ? 'true' : 'false' }},
+                                projectId: {{ $project->id }}
+                            })" 
+                            class="space-y-4"
+                        >
+
+                            <!-- Month navigation -->
+                            <div class="flex items-center justify-between mb-4">
+                                <button @click="prevMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded">Prev</button>
+                                <h2 class="text-lg font-semibold dark:text-gray-100" x-text="monthName + ' ' + year"></h2>
+                                <button @click="nextMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded">Next</button>
+                            </div>
+
+                            <!-- Weekday headers -->
+                            <div class="grid grid-cols-7 text-center font-medium text-gray-700 dark:text-gray-300">
+                                <template x-for="day in weekdays" :key="day">
+                                    <div x-text="day"></div>
+                                </template>
+                            </div>
+
+                            <!-- Calendar grid -->
+                            <div class="grid grid-cols-7 gap-2 text-center">
+                                <!-- Blank days -->
+                                <template x-for="blank in blanks" :key="'b'+blank">
+                                    <div></div>
+                                </template>
+
+                                <!-- Calendar days -->
+                                <template x-for="date in daysInMonth" :key="date">
+                                    <div @click="openModal(date)" 
+                                        class="border rounded-md p-2 cursor-pointer h-24 flex flex-col justify-between"
+                                        :class="getDayClass(date)">
+                                        <div class="font-medium dark:text-gray-100" x-text="date"></div>
+                                        
+                                        <!-- Summary of logs -->
+                                        <div class="text-xs text-left">
+                                            <div x-show="getLogs(date).length > 0" class="flex items-center gap-1">
+                                                <span x-text="getLogs(date).length"></span>
+                                                <span>log(s)</span>
                                             </div>
-                                            <div class="mt-4 flex gap-3">
-                                                <x-primary-button>Update</x-primary-button>
-                                                <a href="{{ route('projects.show', [$project->id, 'section' => 'timelogs']) }}" class="text-gray-500">Cancel</a>
+                                            <div x-show="getTotalHours(date) > 0" class="font-semibold">
+                                                <span x-text="getTotalHours(date)"></span>h
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- 
+                              NEW MODAL
+                              This modal now shows a LIST of logs and the form to add one.
+                            -->
+                            <div x-show="showModal" x-cloak class="fixed inset-0 flex items-center justify-center z-50 p-4">
+                                <!-- overlay -->
+                                <div class="absolute inset-0 bg-black opacity-50" @click="closeModal()"></div>
+                                
+                                <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-2xl z-50">
+                                    
+                                    <!-- Modal Header -->
+                                    <div class="flex items-center justify-between p-4 border-b dark:border-gray-700">
+                                        <h3 class="text-lg font-medium dark:text-gray-100" x-text="selectedDateFormatted"></h3>
+                                        <button @click="closeModal()" class="text-gray-400 hover:text-gray-500">
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        </button>
+                                    </div>
+
+                                    <!-- Modal Body -->
+                                    <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                                        
+                                        <!-- List of existing logs -->
+                                        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Time Logs</h2>
+                                        <div x-show="selectedLogs.length === 0" class="text-gray-500 dark:text-gray-400 text-sm">
+                                            No time logs for this day.
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            <template x-for="log in selectedLogs" :key="log.id">
+                                                <div class="p-3 border rounded-md" :class="{
+                                                    'bg-green-50 dark:bg-green-900/50 border-green-300 dark:border-green-700': log.status == 'Approved',
+                                                    'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-300 dark:border-yellow-700': log.status == 'Pending',
+                                                    'bg-red-50 dark:bg-red-900/50 border-red-300 dark:border-red-700': log.status == 'Declined'
+                                                }">
+                                                    <div class="flex justify-between items-center">
+                                                        <!-- Left Side: Name -->
+                                                        <p class="font-semibold dark:text-gray-100" x-text="log.user_name"></p>
+                                                        
+                                                        <!-- Right Side: Edit/Delete Buttons -->
+                                                        <div x-show="log.user_id == currentUserId || isProjectLead" class="flex gap-2 items-center">
+                                                            <button @click="editLog(log)" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Edit</button>
+                                                            <button @click="deleteLog(log.id)" class="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Log Details -->
+                                                    <div class="mt-2">
+                                                        <p class="text-sm dark:text-gray-300">
+                                                            <span x-text="formatTime(log.time_in)"></span> - 
+                                                            <span x-text="formatTime(log.time_out)"></span>
+                                                            (<span x-text="log.hours"></span>h)
+                                                        </p>
+                                                        <p class="text-xs font-semibold" :class="{
+                                                            'text-green-600 dark:text-green-400': log.status == 'Approved',
+                                                            'text-yellow-600 dark:text-yellow-400': log.status == 'Pending',
+                                                            'text-red-600 dark:text-red-400': log.status == 'Declined'
+                                                        }" x-text="log.status"></p>
+                                                        <p class="mt-2 text-sm dark:text-gray-300" x-text="log.work_output"></p>
+                                                    </div>
+                                                    
+                                                    <!-- Approval/Decline buttons for Lead -->
+                                                    <div x-show="isProjectLead && log.status === 'Pending'" class="flex gap-2 mt-3">
+                                                        <form :action="`/projects/${projectId}/timelogs/${log.id}/approve`" method="POST">
+                                                            @csrf
+                                                            @method('PUT')
+                                                            <x-primary-button class="text-xs !py-1 !px-2 bg-green-600">Approve</x-primary-button>
+                                                        </form>
+                                                        <!-- Decline Form (in a small Alpine component to show/hide) -->
+                                                        <div x-data="{ showDecline: false }">
+                                                            <x-primary-button @click="showDecline = !showDecline" class="!text-xs !py-1 !px-2 !bg-red-600 hover:!bg-red-700 dark:!bg-red-600 dark:hover:!bg-red-700 dark:!text-white">DECLINE</x-primary-button>
+                                                            <form x-show="showDecline" :action="`/projects/${projectId}/timelogs/${log.id}/decline`" method="POST" class="mt-2 flex gap-1">
+                                                                @csrf
+                                                                @method('PUT')
+                                                                <x-text-input type="text" name="decline_reason" placeholder="Reason..." required class="!text-xs !py-1 w-full"/>
+                                                                <x-secondary-button type="submit" class="!text-xs !py-1 !px-2">Go</x-secondary-button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Show decline reason -->
+                                                    <div x-show="log.status == 'Declined' && log.decline_reason" class="mt-2 p-2 bg-red-100 dark:bg-red-800/50 border-l-4 border-red-500 text-red-700 dark:text-red-300 text-sm">
+                                                        <strong>Reason:</strong> <span x-text="log.decline_reason"></span>
+                                                    </div>
+
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <hr class="dark:border-gray-700">
+
+                                        <!-- Add/Edit Time Log Form -->
+                                        <h4 class="text-md font-semibold dark:text-gray-100" x-text="formTitle"></h4>
+                                        <form @submit.prevent="submitLogForm($event)">
+                                            @csrf
+                                            <input type="hidden" name="_method" x-bind:value="formMethod">
+                                            <input type="hidden" name="date" x-bind:value="selectedDate">
+                                            
+                                            <div class="space-y-3">
+                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Time In</label>
+                                                        <input type="time" name="time_in" x-model="formTimeIn" required class="mt-1 block w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Time Out</label>
+                                                        <input type="time" name="time_out" x-model="formTimeOut" required class="mt-1 block w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm">
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Work Output</label>
+                                                    <textarea name="work_output" x-model="formWorkOutput" rows="3" required class="mt-1 block w-full rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm"></textarea>
+                                                </div>
+                                                <!-- Show validation errors -->
+                                                @if ($errors->has('time_in'))
+                                                    <div class="text-sm text-red-600 dark:text-red-400">
+                                                        {{ $errors->first('time_in') }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div class="mt-4 flex justify-end gap-2">
+                                                <button type="button" @click="resetForm()" class="px-3 py-1 rounded bg-gray-300 dark:bg-gray-700 text-sm">Cancel</button>
+                                                <button type="submit" class="px-3 py-1 rounded bg-indigo-600 text-white text-sm" x-text="formButtonText"></button>
                                             </div>
                                         </form>
-                                    @else
-                                        <div class="flex justify-between items-center">
-                                            <div class="text-sm text-gray-400">
-                                                {{ $timeLog->user->first_name }} {{ $timeLog->user->middle_name }} {{ $timeLog->user->last_name }} · {{ $timeLog->user->job_type }} ·
-                                                <span class="text-xs text-gray-400">@if($timeLog->date){{ \Carbon\Carbon::parse($timeLog->date)->format('F j, Y') }}@else <em>No date</em> @endif</span>
-                                            </div>
-                                            <div class="text-sm font-medium">{{ $timeLog->hours }} hours</div>
-                                        </div>
-                                        <div class="mt-2 text-sm">{{ $timeLog->work_output }}</div>
-                                        @if(auth()->user()->is_admin || auth()->id() === $timeLog->user_id)
-                                            <div class="mt-2 flex gap-4">
-                                                <a href="{{ route('projects.show', [$project->id, 'edit_timelog' => $timeLog->id]) }}" class="text-blue-500">Edit</a>
-                                                <form action="{{ route('projects.deleteTimeLog', [$project->id, $timeLog->id]) }}" method="POST">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-red-500" onclick="return confirm('Delete this time log?')">Delete</button>
-                                                </form>
-                                            </div>
-                                        @endif
-                                    @endif
+                                    </div>
                                 </div>
-                            @endforeach
-                        </div>
+                            </div>
 
-                        @if(auth()->user()->is_admin || $project->users->contains(auth()->user()->id))
-                            <form method="POST" action="{{ route('projects.addTimeLog', $project->id) }}" class="mt-6">
-                                @csrf
-                                <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Add a Time Log</h2>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <input type="number" name="hours" step="0.1" required placeholder="Hours worked" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm">
-                                    <input type="date" name="date" required min="{{ $project->start_date }}" max="{{ $project->end_date }}" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm">
-                                    <textarea name="work_output" required placeholder="Work details" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 rounded-md shadow-sm sm:col-span-3"></textarea>
-                                </div>
-                                <div class="mt-4">
-                                    <x-primary-button>Add Time Log</x-primary-button>
-                                </div>
-                            </form>
-                        @endif
+                        </div> <!-- End of timeLogCalendar x-data -->
+
+                        <script>
+                        function timeLogCalendar(data) {
+                            return {
+                                weekdays: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+                                timeLogs: data.timeLogs || {},
+                                currentUserId: data.currentUserId,
+                                isProjectLead: data.isProjectLead,
+                                projectId: data.projectId,
+                                selectedDateFormatted: '',
+
+                                showModal: false,
+                                selectedDate: null,      // 'YYYY-MM-DD'
+                                selectedLogs: [],      // Array of logs for the selected date
+                                
+                                // Form models
+                                formTitle: 'Add Time Log',
+                                formButtonText: 'Save',
+                                formAction: '',
+                                formMethod: 'POST',
+                                formTimeIn: '',
+                                formTimeOut: '',
+                                formWorkOutput: '',
+                                editingLogId: null,
+
+                                month: new Date().getMonth(),
+                                year: new Date().getFullYear(),
+
+                                get monthName() { return new Date(this.year, this.month).toLocaleString('default', { month: 'long' }); },
+                                get daysInMonth() { return Array.from({ length: new Date(this.year, this.month + 1, 0).getDate() }, (_, i) => i + 1); },
+                                get blanks() { return Array.from({ length: new Date(this.year, this.month, 1).getDay() }, (_, i) => i); },
+
+                                // Helper to get the full YYYY-MM-DD date string
+                                getFullDateStr(date) {
+                                    return `${this.year}-${String(this.month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+                                },
+                                
+                                // Get all logs for a specific day
+                                getLogs(date) {
+                                    const dateStr = this.getFullDateStr(date);
+                                    return this.timeLogs[dateStr] || [];
+                                },
+
+                                // Get total hours for a specific day
+                                getTotalHours(date) {
+                                    const logs = this.getLogs(date);
+                                    if (!logs.length) return 0;
+                                    // Sum only *approved* or *pending* hours
+                                    return logs.reduce((total, log) => {
+                                        return (log.status !== 'Declined') ? total + parseFloat(log.hours) : total;
+                                    }, 0).toFixed(2);
+                                },
+
+                                // Get class for the calendar day
+                                getDayClass(date) {
+                                    const logs = this.getLogs(date);
+                                    if (logs.length === 0) return 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600';
+                                    if (logs.some(l => l.status === 'Pending')) return 'bg-yellow-200 dark:bg-yellow-600 hover:bg-yellow-300';
+                                    if (logs.every(l => l.status === 'Approved')) return 'bg-green-200 dark:bg-green-700 hover:bg-green-300';
+                                    if (logs.every(l => l.status === 'Declined')) return 'bg-red-200 dark:bg-red-700 hover:bg-red-300';
+                                    return 'bg-blue-100 dark:bg-blue-800 hover:bg-blue-200'; // Mixed statuses
+                                },
+                                
+                                // Open the modal and set its state
+                                openModal(date) {
+                                    const dateStr = this.getFullDateStr(date);
+                                    this.selectedDate = dateStr;
+                                    this.selectedDateFormatted = new Date(this.year, this.month, date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                                    this.selectedLogs = this.timeLogs[dateStr] || [];
+                                    this.resetForm(); // Set up the "Add" form
+                                    this.showModal = true;
+                                },
+                                
+                                closeModal() {
+                                    this.showModal = false;
+                                    this.selectedDate = null;
+                                    this.selectedLogs = [];
+                                    this.resetForm();
+                                },
+
+                                // Set up the form for adding a new log
+                                resetForm() {
+                                    this.formTitle = 'Add New Time Log';
+                                    this.formButtonText = 'Save';
+                                    this.formAction = `/projects/${this.projectId}/timelogs`;
+                                    this.formMethod = 'POST';
+                                    this.formTimeIn = '';
+                                    this.formTimeOut = '';
+                                    this.formWorkOutput = '';
+                                    this.editingLogId = null;
+                                },
+
+                                // Set up the form for editing an existing log
+                                editLog(log) {
+                                    this.formTitle = 'Edit Time Log';
+                                    this.formButtonText = 'Update';
+                                    this.formAction = `/projects/${this.projectId}/timelogs/${log.id}`;
+                                    this.formMethod = 'PUT';
+                                    this.formTimeIn = log.time_in;
+                                    this.formTimeOut = log.time_out;
+                                    this.formWorkOutput = log.work_output;
+                                    this.editingLogId = log.id;
+                                },
+
+                                submitLogForm(e) {
+                                    const form = e.target;
+                                    const formData = new FormData(form);
+
+                                    // Get the ACTUAL values from the model (not the display)
+                                    const timeIn = this.formTimeIn;   // e.g., "08:00"
+                                    const timeOut = this.formTimeOut; // e.g., "08:45"
+
+                                    if (!timeIn || !timeOut) {
+                                        alert('Please enter valid times.');
+                                        return;
+                                    }
+                                    
+                                    formData.append('_method', this.formMethod);
+
+                                    fetch(this.formAction, {
+                                        method: 'POST',
+                                        headers: {
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                            'Accept': 'application/json',
+                                        },
+                                        body: formData
+                                    })
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            return response.json().then(data => {
+                                                if (data.errors) {
+                                                    const errorMessages = Object.values(data.errors).flat().join('\n');
+                                                    alert(errorMessages);
+                                                } else {
+                                                    alert('An unknown error occurred.');
+                                                }
+                                                return Promise.reject(data);
+                                            });
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        location.reload();
+                                    })
+                                    .catch(async errorData => {
+                                        console.error("Fetch failed:", errorData);
+                                        if (!errorData.errors) {
+                                            alert('An unknown error occurred — check console for details.');
+                                        }
+                                    });
+                                },
+
+                                deleteLog(logId) {
+                                    if (!confirm('Are you sure you want to delete this time log?')) {
+                                        return;
+                                    }
+
+                                    fetch(`/projects/${this.projectId}/timelogs/${logId}`, {
+                                        method: 'DELETE',
+                                        headers: {
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                            'Accept': 'application/json',
+                                        }
+                                    })
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            return response.json().then(data => Promise.reject(data));
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        // It worked! Reload the page.
+                                        location.reload(); 
+                                    })
+                                    .catch(errorData => {
+                                        alert('An error occurred while deleting the log.');
+                                        console.error(errorData);
+                                    });
+                                },
+                                
+                                prevMonth() {
+                                    if (this.month === 0) {
+                                        this.month = 11;
+                                        this.year -= 1;
+                                    } else {
+                                        this.month -= 1;
+                                    }
+                                },
+
+                                nextMonth() {
+                                    if (this.month === 11) {
+                                        this.month = 0;
+                                        this.year += 1;
+                                    } else {
+                                        this.month += 1;
+                                    }
+                                },
+
+                                // Helper for formatting time
+                                formatTime(timeStr) {
+                                    if (!timeStr) return '';
+                                    let [h, m] = timeStr.split(':');
+                                    let ampm = h >= 12 ? 'PM' : 'AM';
+                                    h = h % 12 || 12; // 0 or 12 -> 12
+                                    return `${h}:${m} ${ampm}`;
+                                }
+                            }
+                        }
+                        </script>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>

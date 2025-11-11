@@ -46,9 +46,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/projects/{project}/comments', [ProjectController::class, 'addComment'])->name('projects.comments.store');
     Route::post('/projects/{project}/timelogs', [ProjectController::class, 'addTimeLog'])->name('projects.addTimeLog');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
-    Route::get('/projects/{project}/timelogs/{timeLog}/edit', [ProjectController::class, 'editTimeLog'])->name('projects.editTimeLog');
-    Route::put('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'updateTimeLog'])->name('projects.updateTimeLog');
-    Route::delete('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'deleteTimeLog'])->name('projects.deleteTimeLog');
+    Route::get('/projects/{project}/timelogs/{timeLog}/edit', [ProjectController::class, 'editTimeLog'])->scopeBindings()->name('projects.editTimeLog');
+    Route::put('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'updateTimeLog'])->scopeBindings()->name('projects.updateTimeLog');
+    Route::delete('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'deleteTimeLog'])->scopeBindings()->name('projects.deleteTimeLog');
+    Route::put('/projects/{project}/timelogs/{timeLog}/approve', [ProjectController::class, 'approveTimeLog'])->scopeBindings()->name('projects.approveTimeLog');
+    Route::put('/projects/{project}/timelogs/{timeLog}/decline', [ProjectController::class, 'declineTimeLog'])->scopeBindings()->name('projects.declineTimeLog');
+
 
     // Projects (admin-only)
     Route::middleware('admin')->group(function () {
@@ -59,6 +62,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/projects/{project}/update-user/{user}', [ProjectController::class, 'updateUserRole'])->name('projects.updateUserRole');
         Route::delete('/projects/{project}/remove-user/{user}', [ProjectController::class, 'removeUser'])->name('projects.removeUser');
         Route::post('/projects/{project}/set-permission', [ProjectController::class, 'setPermission'])->name('projects.setPermission');
+        Route::put('/projects/{project}/team', [ProjectController::class, 'updateTeam'])->name('projects.updateTeam');
     });
 
     // Payslip
@@ -71,6 +75,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/payslip/calc-hours', [PayslipController::class, 'calculateHours'])->name('payslip.calculateHours');
     });
 
+    //Payroll
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('payrolls/create', [\App\Http\Controllers\PayrollController::class, 'create'])->name('payrolls.create');
+        Route::post('payrolls/generate', [\App\Http\Controllers\PayrollController::class, 'generate'])->name('payrolls.generate');
+    });
+
     // Leaves
     Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
     // Leaves Admin actions
@@ -78,15 +88,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
         Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
         Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
-    });
-
-    // Cash Loans
-    Route::resource('cashloans', CashLoanController::class)->parameters(['cashloans' => 'cashloan']);
-    // Cash Loans Admin actions
-    Route::middleware('admin')->group(function () {
-        Route::post('cashloans/{cashloan}/activate', [CashLoanController::class, 'activate'])->name('cashloans.activate');
-        Route::post('cashloans/{cashloan}/mark-paid', [CashLoanController::class, 'markPaid'])->name('cashloans.markPaid');
-        Route::post('cashloans/{cashloan}/cancel', [CashLoanController::class, 'cancel'])->name('cashloans.cancel');
     });
 });
 
