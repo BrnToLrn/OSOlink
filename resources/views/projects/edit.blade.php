@@ -47,36 +47,78 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <x-input-label for="start_date" :value="__('Start Date')" />
-                            <input type="date" name="start_date" value="{{ old('start_date', $project->start_date) }}"
-                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
-                                required />
+                            <input 
+                                type="date" 
+                                id="start_date"
+                                name="start_date" 
+                                value="{{ old('start_date') }}"
+                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 
+                                    focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 
+                                    dark:focus:ring-indigo-600 rounded-md shadow-sm"
+                                required 
+                            />
                             <x-input-error class="mt-2" :messages="$errors->get('start_date')" />
                         </div>
+
                         <div>
                             <x-input-label for="end_date" :value="__('End Date')" />
-                            <input type="date" name="end_date" value="{{ old('end_date', $project->end_date) }}"
-                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
-                                required />
+                            <input 
+                                type="date" 
+                                id="end_date"
+                                name="end_date" 
+                                value="{{ old('end_date') }}"
+                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 
+                                    focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 
+                                    dark:focus:ring-indigo-600 rounded-md shadow-sm"
+                                required 
+                            />
                             <x-input-error class="mt-2" :messages="$errors->get('end_date')" />
                         </div>
                     </div>
 
-                    <!-- User Assignment -->
-                    <div>
-                        <x-input-label for="user_ids" :value="__('Assign Users (hold Ctrl/Cmd to multi-select)')" />
-                        <select name="user_ids[]" id="user_ids" multiple
-                            class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm">
-                            @forelse($users as $user)
-                                <option value="{{ $user->id }}" 
-                                    {{ (collect(old('user_ids', $project->users->pluck('id')))->contains($user->id)) ? 'selected' : '' }}>
-                                    {{ $user->first_name }} {{ $user->middle_name }} {{ $user->last_name }} — {{ $user->email }} — {{ $user->job_type }}
-                                </option>
-                            @empty
-                                <option disabled>No users available</option>
-                            @endforelse
-                        </select>
-                        <x-input-error class="mt-2" :messages="$errors->get('user_ids')" />
-                    </div>
+                    @push('scripts')
+                    <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const startInput = document.getElementById('start_date');
+                        const endInput = document.getElementById('end_date');
+
+                        if (!startInput || !endInput) return;
+
+                        const today = new Date().toISOString().split('T')[0];
+
+                        // Initialize start date if empty
+                        if (!startInput.value) startInput.value = today;
+                        startInput.min = today;
+
+                        // Helper to add days to a date string
+                        function addDays(dateStr, days) {
+                            const date = new Date(dateStr + 'T00:00:00');
+                            date.setDate(date.getDate() + days);
+                            return date.toISOString().split('T')[0];
+                        }
+
+                        function updateEndDate() {
+                            const start = startInput.value;
+                            if (!start) return;
+
+                            // End date cannot be before start
+                            endInput.min = start;
+
+                            // If end date is empty or less than start + 7 days, auto-set it
+                            const defaultEnd = addDays(start, 7);
+                            if (!endInput.value || endInput.value < start || endInput.value < defaultEnd) {
+                                endInput.value = defaultEnd;
+                            }
+                        }
+
+                        // Initialize end date on load
+                        updateEndDate();
+
+                        // Update end date whenever start date changes
+                        startInput.addEventListener('change', updateEndDate);
+                    });
+                    </script>
+                    @endpush
 
                     <x-primary-button type="submit">
                         Update Project
