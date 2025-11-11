@@ -45,11 +45,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/projects/{project}/comments', [ProjectController::class, 'addComment'])->name('projects.comments.store');
     Route::post('/projects/{project}/timelogs', [ProjectController::class, 'addTimeLog'])->name('projects.addTimeLog');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
-    Route::get('/projects/{project}/timelogs/{timeLog}/edit', [ProjectController::class, 'editTimeLog'])->name('projects.editTimeLog');
-    Route::put('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'updateTimeLog'])->name('projects.updateTimeLog');
-    Route::delete('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'deleteTimeLog'])->name('projects.deleteTimeLog');
-    Route::post('/projects/{project}/timelogs/{timeLog}/approve', [ProjectController::class, 'approveTimeLog'])->name('projects.approveTimeLog');
-    Route::post('/projects/{project}/timelogs/{timeLog}/decline', [ProjectController::class, 'declineTimeLog'])->name('projects.declineTimeLog');
+    Route::get('/projects/{project}/timelogs/{timeLog}/edit', [ProjectController::class, 'editTimeLog'])->scopeBindings()->name('projects.editTimeLog');
+    Route::put('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'updateTimeLog'])->scopeBindings()->name('projects.updateTimeLog');
+    Route::delete('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'deleteTimeLog'])->scopeBindings()->name('projects.deleteTimeLog');
+    Route::put('/projects/{project}/timelogs/{timeLog}/approve', [ProjectController::class, 'approveTimeLog'])->scopeBindings()->name('projects.approveTimeLog');
+    Route::put('/projects/{project}/timelogs/{timeLog}/decline', [ProjectController::class, 'declineTimeLog'])->scopeBindings()->name('projects.declineTimeLog');
+
 
     // Projects (admin-only)
     Route::middleware('admin')->group(function () {
@@ -77,9 +78,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
     // Leaves Admin actions
     Route::middleware('admin')->group(function () {
-    Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
-    Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
-    Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
+        Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
+        Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
+        Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
     });
 });
 
