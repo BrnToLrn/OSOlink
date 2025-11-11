@@ -47,7 +47,7 @@ class ProjectController extends Controller
     // Show create form (admin only)
     public function create()
     {
-        $users = User::where('is_active', true)->where('is_admin', false)->get();
+        $users = User::where('is_active', true)->get();
         return view('projects.create', compact('users'));
     }
 
@@ -55,30 +55,48 @@ class ProjectController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'name' => 'required|string',
+            'description' => 'required|string',
             'status' => 'required|in:Not Started,In Progress,On Hold,Completed',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
             'user_ids' => 'nullable|array',
             'user_ids.*' => 'exists:users,id',
+            'project_lead_id' => [
+                'nullable',
+                'exists:users,id',
+                // This ensures the lead is also in the selected users list
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($value && $request->has('user_ids') && !in_array($value, $request->user_ids)) {
+                        $fail('The project lead must be one of the assigned users.');
+                    }
+                },
+            ],
         ]);
 
-        $project = Project::create([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status' => $validated['status'],
-            'start_date' => $validated['start_date'] ?? null,
-            'end_date' => $validated['end_date'] ?? null,
-            'created_by' => Auth::id(),
-        ]);
+        $validated['created_by'] = auth()->id();
 
-        if (!empty($validated['user_ids'])) {
-            $project->users()->sync($validated['user_ids']);
+        $project = Project::create($validated);
+
+        // Attach users with their roles
+        if ($request->has('user_ids')) {
+            $projectLeadId = $request->project_lead_id;
+
+            // Prepare the data for the project_users pivot table
+            $usersToAttach = [];
+            foreach ($request->user_ids as $userId) {
+                // We add the `project_role` to the pivot table data
+                $usersToAttach[$userId] = [
+                    'project_role' => ($userId == $projectLeadId) ? 'Project Lead' : 'Developer'
+                ];
+            }
+
+            // Attach all users and their roles in a single database query
+            $project->users()->attach($usersToAttach);
         }
 
-        return redirect()->route('projects.show', $project->id)
-            ->with('success', 'Project created successfully.');
+
+        return redirect()->route('projects.show', $project)->with('success', 'Project created successfully!');
     }
 
     // Show project
@@ -99,16 +117,39 @@ class ProjectController extends Controller
                 'permissions.user',
                 'creator'
             ]);
-            return view('projects.show', compact('project'));
+
+            // Precompute selected users for AlpineJS
+            $selectedUsers = $project->users->map(function($u) {
+                return [
+                    'id' => $u->id,
+                    'first_name' => $u->first_name,
+                    'middle_name' => $u->middle_name,
+                    'last_name' => $u->last_name,
+                    'email' => $u->email,
+                    'project_role' => $u->pivot->project_role,
+                ];
+            })->toArray();
+
+            // Find project lead id
+            $projectLeadId = optional($project->users->firstWhere('pivot.project_role', 'Project Lead'))->id;
+
+            // Get all active users not already assigned
+            $allUsers = User::where('is_active', true)
+                ->whereNotIn('id', $project->users->pluck('id'))
+                ->get();
+
+            // Pass everything to the view
+            return view('projects.show', compact('project', 'allUsers', 'selectedUsers', 'projectLeadId'));
         }
 
         abort(403, 'You do not have access to this project.');
     }
 
+
     // Edit project
     public function edit(Project $project)
     {
-        $users = User::where('is_active', true)->where('is_admin', false)->get();
+        $users = User::where('is_active', true)->get();
         return view('projects.edit', compact('project', 'users'));
     }
 
@@ -123,18 +164,34 @@ class ProjectController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'user_ids' => 'nullable|array',
             'user_ids.*' => 'exists:users,id',
+            'project_lead_id' => [
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($value && $request->has('user_ids') && !in_array($value, $request->user_ids)) {
+                        $fail('The project lead must be one of the assigned users.');
+                    }
+                },
+            ],
         ]);
 
-        $project->update([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status' => $validated['status'],
-            'start_date' => $validated['start_date'] ?? null,
-            'end_date' => $validated['end_date'] ?? null,
-        ]);
+        $project->update($validated);
 
-        if (array_key_exists('user_ids', $validated)) {
-            $project->users()->sync($validated['user_ids'] ?? []);
+        if ($request->has('user_ids')) {
+            $projectLeadId = $request->project_lead_id;
+
+            $usersToSync = [];
+            foreach ($request->user_ids as $userId) {
+                $usersToSync[$userId] = [
+                    'project_role' => ($userId == $projectLeadId) ? 'Project Lead' : 'Developer'
+                ];
+            }
+            // `sync` is correct for updates: it adds new users, removes
+            // ones that were unchecked, and updates roles for existing ones.
+            $project->users()->sync($usersToSync);
+        } else {
+            // If no users were sent, detach all of them.
+            $project->users()->detach();
         }
 
         return redirect()->route('projects.show', $project->id)
@@ -149,11 +206,36 @@ class ProjectController extends Controller
     }
 
     // Assign/remove users
-    public function assignUser(Request $request, Project $project)
+    public function addUser(Request $request, Project $project)
     {
-        $validated = $request->validate(['user_id' => 'required|exists:users,id']);
-        $project->users()->syncWithoutDetaching([$validated['user_id']]);
-        return back()->with('success', 'User assigned.');
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'project_role' => 'required|string'
+        ]);
+
+        // Prevent duplicates
+        if ($project->users->contains($request->user_id)) {
+            return back()->with('error', 'User already in project.');
+        }
+
+        $project->users()->attach($request->user_id, ['project_role' => $request->project_role]);
+        return back()->with('success', 'User added successfully.');
+    }
+
+    public function updateUserRole(Request $request, Project $project, User $user)
+    {
+        $request->validate([
+            'project_role' => 'required|string'
+        ]);
+
+        // Check if user is part of the project
+        if (!$project->users->contains($user->id)) {
+            return back()->with('error', 'User not part of the project.');
+        }
+
+        // Update pivot table
+        $project->users()->updateExistingPivot($user->id, ['project_role' => $request->project_role]);
+        return back()->with('success', 'User role updated successfully.');
     }
 
     public function removeUser(Project $project, User $user)

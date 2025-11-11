@@ -21,7 +21,9 @@ class Project extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'project_user')->withTimestamps();
+        return $this->belongsToMany(User::class, 'project_user')
+                    ->withPivot('project_role')
+                    ->withTimestamps();
     }
 
     public function timeLogs()
