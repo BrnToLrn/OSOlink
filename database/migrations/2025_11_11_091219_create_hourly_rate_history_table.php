@@ -6,17 +6,15 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('dependents', function (Blueprint $table) {
+        Schema::create('hourly_rate_history', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
-            $table->string('relationship');
-            $table->date('date_of_birth');
+            $table->foreignId('changed_by')->constrained('users')->cascadeOnDelete();
+            $table->decimal('old_rate', 10, 2);
+            $table->decimal('new_rate', 10, 2);
+            $table->timestamp('time_changed')->useCurrent();
             $table->timestamps();
         });
     }
@@ -26,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('dependents');
+        Schema::dropIfExists('hourly_rate_history');
     }
 };

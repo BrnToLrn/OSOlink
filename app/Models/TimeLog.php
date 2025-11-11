@@ -21,6 +21,11 @@ class TimeLog extends Model
         'decline_reason',
     ];
 
+    protected $casts = [
+        'hours' => 'float',
+        'date' => 'date',
+    ];
+
     public function project()
     {
         return $this->belongsTo(Project::class);

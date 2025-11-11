@@ -63,33 +63,24 @@ Route::middleware('auth')->group(function () {
         Route::put('/projects/{project}/team', [ProjectController::class, 'updateTeam'])->name('projects.updateTeam');
     });
 
-    // Payroll (Records first)
-    Route::get('/payroll', [PayrollController::class, 'records'])->name('payroll.index'); // default: records
-    Route::get('/payroll/create', [PayrollController::class, 'index'])->name('payroll.create'); // add form
-    // Back-compat: old /payroll/records -> redirect to index
-    Route::get('/payroll/records', function () {
-        return redirect()->route('payroll.index');
-    })->name('payroll.records');
-    // Hours endpoint
-    Route::get('/payroll/hours', [PayrollController::class, 'hours'])->name('payroll.hours');
-
-    Route::middleware('admin')->group(function () {
-        Route::post('/payroll', [PayrollController::class, 'store'])->name('payroll.store');
-        Route::get('/payroll/{payroll}/edit', [PayrollController::class, 'edit'])->name('payroll.edit');
-        Route::put('/payroll/{payroll}', [PayrollController::class, 'update'])->name('payroll.update');
-        Route::delete('/payroll/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
-    });
-
     // Payslip
     Route::get('/payslip', [PayslipController::class, 'index'])->name('payslip.index');
     Route::get('/payslip/{payslip}', [PayslipController::class, 'show'])->name('payslip.show');
-    Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
+    // Payslip Admin actions
+    Route::middleware('admin')->group(function () {
+        Route::get('/payslip/manage', [PayslipController::class, 'manage'])->name('payslip.manage');
+        Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
+        Route::post('/payslip/calc-hours', [PayslipController::class, 'calculateHours'])->name('payslip.calculateHours');
+    });
 
-    // Leaves — shared by admin and employees
+    // Leaves
     Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
+    // Leaves Admin actions
+    Route::middleware('admin')->group(function () {
     Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
     Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
     Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
+    });
 });
 
 // Admin panel routes
