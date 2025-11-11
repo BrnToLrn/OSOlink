@@ -48,6 +48,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects/{project}/timelogs/{timeLog}/edit', [ProjectController::class, 'editTimeLog'])->name('projects.editTimeLog');
     Route::put('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'updateTimeLog'])->name('projects.updateTimeLog');
     Route::delete('/projects/{project}/timelogs/{timeLog}', [ProjectController::class, 'deleteTimeLog'])->name('projects.deleteTimeLog');
+    Route::post('/projects/{project}/timelogs/{timeLog}/approve', [ProjectController::class, 'approveTimeLog'])->name('projects.approveTimeLog');
+    Route::post('/projects/{project}/timelogs/{timeLog}/decline', [ProjectController::class, 'declineTimeLog'])->name('projects.declineTimeLog');
 
     // Projects (admin-only)
     Route::middleware('admin')->group(function () {
@@ -58,6 +60,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/projects/{project}/update-user/{user}', [ProjectController::class, 'updateUserRole'])->name('projects.updateUserRole');
         Route::delete('/projects/{project}/remove-user/{user}', [ProjectController::class, 'removeUser'])->name('projects.removeUser');
         Route::post('/projects/{project}/set-permission', [ProjectController::class, 'setPermission'])->name('projects.setPermission');
+        Route::put('/projects/{project}/team', [ProjectController::class, 'updateTeam'])->name('projects.updateTeam');
     });
 
     // Payroll (Records first)

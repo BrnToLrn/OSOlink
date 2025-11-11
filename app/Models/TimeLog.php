@@ -12,9 +12,13 @@ class TimeLog extends Model
     protected $fillable = [
         'user_id',
         'project_id',
-        'hours',
         'work_output',
         'date',
+        'time_in',
+        'time_out',
+        'hours',
+        'status',
+        'decline_reason',
     ];
 
     public function project()
@@ -25,5 +29,15 @@ class TimeLog extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+        public function approve()
+    {
+        $this->update(['status' => 'Approved', 'decline_reason' => null]);
+    }
+
+    public function decline($reason)
+    {
+        $this->update(['status' => 'Declined', 'decline_reason' => $reason]);
     }
 }
