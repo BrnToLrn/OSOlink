@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Payslip;
 use App\Models\Payroll;
 use App\Models\User;
+use App\Models\TimeLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -36,9 +37,7 @@ class PayslipController extends Controller
                 'period_from' => 'required|date',
                 'period_to' => 'required|date|after_or_equal:period_from',
                 'hours_worked' => 'nullable|numeric|min:0',
-                'hourly_rate' => 'nullable|numeric|min:0',
-                'job_type' => 'nullable|string',
-                'deductions' => 'nullable|numeric|min:0',
+                'hourly_rate' => 'required|numeric|min:0',
             ]);
 
             $gross = ($data['hours_worked'] ?? 0) * ($data['hourly_rate'] ?? 0);
@@ -49,13 +48,11 @@ class PayslipController extends Controller
                 'user_id' => $data['user_id'],
                 'period_from' => $data['period_from'],
                 'period_to' => $data['period_to'],
-                'job_type' => $data['job_type'],
                 'hours_worked' => $data['hours_worked'] ?? 0,
                 'hourly_rate' => $data['hourly_rate'] ?? 0,
                 'gross_pay' => $gross,
-                'deductions' => $deductions,
                 'net_pay' => $net,
-                'issued_at' => now(),
+                'issue_date' => now(),
                 'status' => 'issued',
             ]);
 
@@ -69,5 +66,27 @@ class PayslipController extends Controller
             }
 
             return view('payslip.show', compact('payslip'));
+        }
+
+        public function calculateHours(Request $request)
+        {
+            $data = $request->validate([
+                'user_id' => 'required|exists:users,id',
+                'period_from' => 'required|date',
+                'period_to' => 'required|date|after_or_equal:period_from',
+                'hourly_rate' => 'nullable|numeric|min:0',
+            ]);
+
+            $hours = (float) TimeLog::where('user_id', $data['user_id'])
+                ->whereBetween('date', [$data['period_from'], $data['period_to']])
+                ->sum('hours');
+
+            $rate = isset($data['hourly_rate']) && $data['hourly_rate'] !== ''
+                ? (float) $data['hourly_rate']
+                : optional(User::find($data['user_id']))->hourly_rate ?? 0;
+
+            $gross = round($hours * $rate, 2);
+
+            return response()->json(['hours' => round($hours, 2), 'gross' => $gross]);
         }
 }

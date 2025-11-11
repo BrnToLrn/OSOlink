@@ -14,24 +14,24 @@
         <table class="rounded-lg overflow-hidden w-full divide-y divide-gray-300 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Period</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Net Pay</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Total Deductions</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Gross Pay</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Issued</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Status</th>
-                    <th class="px-4 py-2 text-center text-sm font-medium">Actions</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Period</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Net Pay</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Total Deductions</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Gross Pay</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Issued</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Status</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-gray-200 dark:bg-gray-900 text-sm">
+            <tbody class="divide-gray-200 dark:bg-gray-900">
                 @forelse($payslips as $p)
                     <tr class="bg-white dark:bg-gray-900">
-                        <td class="px-4 py-3 text-center">{{ $p->period_from->format('Y-m-d') }} — {{ $p->period_to->format('Y-m-d') }}</td>
-                        <td class="px-4 py-3 text-center">${{ number_format($p->net_pay, 2) }}</td>
-                        <td class="px-4 py-3 text-center">${{ number_format($p->deductions, 2) }}</td>
-                        <td class="px-4 py-3 text-center">${{ number_format($p->gross_pay, 2) }}</td>
-                        <td class="px-4 py-3 text-center">{{ optional($p->issued_at)->format('Y-m-d') }}</td>
-                        <td class="px-4 py-3 text-center">{{ ucfirst($p->status) }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $p->period_from->format('Y-m-d') }} — {{ $p->period_to->format('Y-m-d') }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">${{ number_format($p->net_pay, 2) }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">${{ number_format($p->deductions, 2) }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">${{ number_format($p->gross_pay, 2) }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ optional($p->issued_at)->format('Y-m-d') }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ ucfirst($p->status) }}</td>
                         <td class="px-4 py-3 text-center">
                             <a href="{{ route('payslip.show', $p) }}" class="text-indigo-600">View</a>
                         </td>

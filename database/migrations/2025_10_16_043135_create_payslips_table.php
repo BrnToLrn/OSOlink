@@ -13,6 +13,8 @@ return new class extends Migration {
             $table->date('period_from');
             $table->date('period_to');
             $table->date('issue_date');
+            $table->decimal('hours_worked', 8, 2);
+            $table->decimal('hourly_rate', 10, 2);
             $table->decimal('gross_pay', 10, 2);
             $table->decimal('net_pay', 10, 2);
             $table->timestamps();

@@ -17,6 +17,11 @@ class TimeLog extends Model
         'date',
     ];
 
+    protected $casts = [
+        'hours' => 'float',
+        'date' => 'date',
+    ];
+
     public function project()
     {
         return $this->belongsTo(Project::class);

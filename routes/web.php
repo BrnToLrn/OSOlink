@@ -60,23 +60,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/projects/{project}/set-permission', [ProjectController::class, 'setPermission'])->name('projects.setPermission');
     });
 
-    // Payroll (Records first)
-    Route::get('/payroll', [PayrollController::class, 'records'])->name('payroll.index'); // default: records
-    Route::get('/payroll/create', [PayrollController::class, 'index'])->name('payroll.create'); // add form
-    // Back-compat: old /payroll/records -> redirect to index
-    Route::get('/payroll/records', function () {
-        return redirect()->route('payroll.index');
-    })->name('payroll.records');
-    // Hours endpoint
-    Route::get('/payroll/hours', [PayrollController::class, 'hours'])->name('payroll.hours');
-
-    Route::middleware('admin')->group(function () {
-        Route::post('/payroll', [PayrollController::class, 'store'])->name('payroll.store');
-        Route::get('/payroll/{payroll}/edit', [PayrollController::class, 'edit'])->name('payroll.edit');
-        Route::put('/payroll/{payroll}', [PayrollController::class, 'update'])->name('payroll.update');
-        Route::delete('/payroll/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
-    });
-
     // Payslip
     Route::get('/payslip', [PayslipController::class, 'index'])->name('payslip.index');
     Route::get('/payslip/{payslip}', [PayslipController::class, 'show'])->name('payslip.show');
@@ -84,6 +67,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('admin')->group(function () {
         Route::get('/payslip/manage', [PayslipController::class, 'manage'])->name('payslip.manage');
         Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
+        Route::post('/payslip/calc-hours', [PayslipController::class, 'calculateHours'])->name('payslip.calculateHours');
     });
 
     // Leaves

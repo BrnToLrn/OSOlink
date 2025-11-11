@@ -20,10 +20,9 @@ class DatabaseSeeder extends Seeder
             ['email' => 'admin@admin.com'], // lookup key
             [
                 'first_name' => 'Admin',
-                'last_name' => 'Admin',
+                'last_name' => 'User',
                 'password' => Hash::make('password'), // change to a secure password
                 'job_type' => 'Administrator',
-                'employment_status' => 'Full-time',
                 'hourly_rate' => 0,
                 'is_admin' => true,
                 'is_active' => true,
