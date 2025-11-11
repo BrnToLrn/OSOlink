@@ -80,13 +80,20 @@ Route::middleware('auth')->group(function () {
     // Payslip
     Route::get('/payslip', [PayslipController::class, 'index'])->name('payslip.index');
     Route::get('/payslip/{payslip}', [PayslipController::class, 'show'])->name('payslip.show');
-    Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
+    // Payslip Admin actions
+    Route::middleware('admin')->group(function () {
+        Route::get('/payslip/manage', [PayslipController::class, 'manage'])->name('payslip.manage');
+        Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
+    });
 
-    // Leaves — shared by admin and employees
+    // Leaves
     Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
+    // Leaves Admin actions
+    Route::middleware('admin')->group(function () {
     Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
     Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
     Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
+    });
 });
 
 // Admin panel routes

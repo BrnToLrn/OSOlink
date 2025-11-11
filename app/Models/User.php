@@ -23,12 +23,10 @@ class User extends Authenticatable
         'email',
         'job_type',
         'hourly_rate',
-        'base_pay',
         'gender',
         'phone',
         'birthday',
         'country',
-        'currency_code',
         'state',
         'zip',
         'address',
@@ -91,5 +89,10 @@ class User extends Authenticatable
     public function leaves()
     {
         return $this->hasMany(\App\Models\Leave::class);
+    }
+    
+    public function payslips()
+    {
+        return $this->hasMany(Payslip::class);
     }
 }

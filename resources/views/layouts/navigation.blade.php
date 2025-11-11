@@ -14,33 +14,28 @@
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <!-- Dashboard -->
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
+                        Dashboard
                     </x-nav-link>
 
                     <!-- Projects -->
                     <x-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
-                        {{ __('Projects') }}
+                        Projects
                     </x-nav-link>
 
                     <!-- Leaves -->
                     <x-nav-link :href="route('leaves.index')" :active="request()->routeIs('leaves.*')">
-                        {{ __('Leaves') }}
+                        Leaves
                     </x-nav-link>
 
                     <!-- Payslip -->
                     <x-nav-link :href="route('payslip.index')" :active="request()->routeIs('payslip.*')">
-                        {{ __('Payslip') }}
+                        Payslip
                     </x-nav-link>
 
                     @if (Auth::check() && Auth::user()->is_admin)
                         <!-- Admin Panel -->
                         <x-nav-link :href="route('adminpanel.admin')" :active="request()->routeIs('adminpanel.admin')">
-                            {{ __('Admin Panel') }}
-                        </x-nav-link>
-
-                        <!-- Payroll (now opens records first) -->
-                        <x-nav-link :href="route('payroll.index')" :active="request()->routeIs('payroll.*')">
-                            {{ __('Payroll') }}
+                            Admin Panel
                         </x-nav-link>
                     @endif
                 </div>
@@ -81,7 +76,7 @@
                     <x-slot name="content">
                         <!-- Profile -->
                         <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
+                            Profile
                         </x-dropdown-link>
 
                         <!-- Logout -->
@@ -89,7 +84,7 @@
                             @csrf
                             <x-dropdown-link :href="route('logout')"
                                 onclick="event.preventDefault(); this.closest('form').submit();">
-                                {{ __('Log Out') }}
+                                Log Out
                             </x-dropdown-link>
                         </form>
                     </x-slot>
@@ -117,30 +112,25 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
+                Dashboard
             </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">
-                {{ __('Projects') }}
+                Projects
             </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('leaves.index')" :active="request()->routeIs('leaves.*')">
-                {{ __('Leaves') }}
+                Leaves
             </x-responsive-nav-link>
 
             <!-- Payslip -->
             <x-responsive-nav-link :href="route('payslip.index')" :active="request()->routeIs('payslip.*')">
-                {{ __('Payslip') }}
+                Payslip
             </x-responsive-nav-link>
 
             @if (Auth::check() && Auth::user()->is_admin)
                 <x-responsive-nav-link :href="route('adminpanel.admin')" :active="request()->routeIs('adminpanel.admin')">
-                    {{ __('Admin Panel') }}
-                </x-responsive-nav-link>
-
-                <!-- Payroll (records first) -->
-                <x-responsive-nav-link :href="route('payroll.index')" :active="request()->routeIs('payroll.*')">
-                    {{ __('Payroll') }}
+                    Admin Panel
                 </x-responsive-nav-link>
             @endif
         </div>
@@ -167,14 +157,14 @@
 
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profile') }}
+                    Profile
                 </x-responsive-nav-link>
 
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <x-responsive-nav-link :href="route('logout')"
                         onclick="event.preventDefault(); this.closest('form').submit();">
-                        {{ __('Log Out') }}
+                        Log Out
                     </x-responsive-nav-link>
                 </form>
             </div>

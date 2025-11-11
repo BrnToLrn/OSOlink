@@ -4,68 +4,70 @@ namespace App\Http\Controllers;
 
 use App\Models\Payslip;
 use App\Models\Payroll;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PayslipController extends Controller
 {
-    // List payslips: admin sees all, employee sees only their own
     public function index()
-    {
-        $query = Payslip::with(['user','payroll'])->latest();
+        {
+            $payslips = auth()->user()->payslips()->latest()->get();
+            $users = null;
 
-        if (!Auth::user()?->is_admin) {
-            $query->where('user_id', Auth::id());
+            if (Auth::user() && Auth::user()->is_admin) {
+                $users = User::orderBy('id')->get();
+            }
+            
+            return view('payslip.index', compact('payslips', 'users'));
         }
 
-        $payslips = $query->paginate(12);
+        // admin manage (shows form + employees)
+        public function manage()
+        {
+            $users = User::orderBy('name')->get();
+            return view('payslip.partials.admin', compact('users'));
+        }
 
-        return view('payslip.index', compact('payslips'));
-    }
+        public function store(Request $request)
+        {
+            $data = $request->validate([
+                'user_id' => 'required|exists:users,id',
+                'period_from' => 'required|date',
+                'period_to' => 'required|date|after_or_equal:period_from',
+                'hours_worked' => 'nullable|numeric|min:0',
+                'hourly_rate' => 'nullable|numeric|min:0',
+                'job_type' => 'nullable|string',
+                'deductions' => 'nullable|numeric|min:0',
+            ]);
 
-    // Show a specific payslip (owner or admin)
-    public function show(Payslip $payslip)
-    {
-        $user = Auth::user();
-        abort_unless($user && ($user->is_admin || (int)$payslip->user_id === (int)$user->id), 403);
+            $gross = ($data['hours_worked'] ?? 0) * ($data['hourly_rate'] ?? 0);
+            $deductions = $data['deductions'] ?? 0;
+            $net = max(0, $gross - $deductions);
 
-        // Render the detailed breakdown view
-        return view('payslip.view', compact('payslip'));
-    }
+            $payslip = Payslip::create([
+                'user_id' => $data['user_id'],
+                'period_from' => $data['period_from'],
+                'period_to' => $data['period_to'],
+                'job_type' => $data['job_type'],
+                'hours_worked' => $data['hours_worked'] ?? 0,
+                'hourly_rate' => $data['hourly_rate'] ?? 0,
+                'gross_pay' => $gross,
+                'deductions' => $deductions,
+                'net_pay' => $net,
+                'issued_at' => now(),
+                'status' => 'issued',
+            ]);
 
-    // Admin: create or refresh a payslip from a Payroll record
-    // Route: POST /payslip with { payroll_id }
-    public function store(Request $request)
-    {
-        $user = Auth::user();
-        abort_unless($user && $user->is_admin, 403);
+            return redirect()->back()->with('success', 'Payslip added.');
+        }
 
-        $data = $request->validate([
-            'payroll_id' => ['required','exists:payrolls,id'],
-        ]);
+        public function show(Payslip $payslip)
+        {
+            if (! Auth::user()->is_admin && Auth::id() !== $payslip->user_id) {
+                abort(403);
+            }
 
-        $payroll = Payroll::with('user')->findOrFail($data['payroll_id']);
-
-        $gross = (float) ($payroll->gross_pay ?? 0);
-        $ded   = (float) ($payroll->deductions ?? 0);
-        $net   = (float) ($payroll->net_pay ?? max(0, $gross - $ded));
-
-        $payslip = Payslip::updateOrCreate(
-            ['payroll_id' => $payroll->id],
-            [
-                'user_id'          => $payroll->user_id,
-                'period_from'      => $payroll->period_from ?? null,
-                'period_to'        => $payroll->period_to ?? null,
-                'total_earnings'   => $gross,
-                'tax_deduction'    => (float) ($payroll->tax_deduction ?? 0),
-                'other_deductions' => max(0, $ded - (float)($payroll->tax_deduction ?? 0)),
-                'total_deductions' => $ded,
-                'net_pay'          => $net,
-                'status'           => 'Issued',
-                'issued_at'        => now(),
-            ]
-        );
-
-        return redirect()->route('payslip.show', $payslip)->with('success', 'Payslip generated.');
-    }
+            return view('payslip.show', compact('payslip'));
+        }
 }
