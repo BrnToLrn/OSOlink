@@ -5,10 +5,10 @@
                 <header class="flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                            {{ __('Manage Projects') }}
+                            Manage Projects
                         </h2>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            {{ __("Search, filter, and sort projects.") }}
+                            Search, filter, and sort projects.
                         </p>
                     </div>
                     @if(auth()->user()->is_admin)

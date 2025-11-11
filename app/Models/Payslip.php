@@ -10,23 +10,21 @@ class Payslip extends Model
     use HasFactory;
 
     protected $fillable = [
-        'payroll_id',
         'user_id',
         'period_from',
         'period_to',
-        'total_earnings',
-        'tax_deduction',
-        'other_deductions',
-        'total_deductions',
+        'hours_worked',
+        'hourly_rate',
+        'gross_pay',
+        'adjustments',
         'net_pay',
-        'status',
-        'issued_at',
+        'issue_date',
     ];
 
     protected $casts = [
         'period_from' => 'date',
         'period_to'   => 'date',
-        'issued_at'   => 'datetime',
+        'issue_date'   => 'date',
     ];
 
     public function user()
@@ -37,5 +35,10 @@ class Payslip extends Model
     public function payroll()
     {
         return $this->belongsTo(Payroll::class);
+    }
+
+    public function adjustments()
+    {
+        return $this->hasMany(\App\Models\Adjustment::class);
     }
 }
