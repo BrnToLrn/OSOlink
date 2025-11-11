@@ -11,19 +11,60 @@ use Illuminate\Support\Facades\Auth;
 
 class PayslipController extends Controller
 {
-    public function index()
-        {
-            $payslips = auth()->user()->payslips()->latest()->get();
-            $users = null;
-            $allPayslips = null;
+    public function index(Request $request)
+    {
+        // default - current user's payslips
+        $payslips = auth()->user()->payslips()->latest()->get();
+        $users = null;
+        $allPayslips = null;
 
-            if (Auth::user() && Auth::user()->is_admin) {
-                $users = User::orderBy('id')->get();
-                $allPayslips = Payslip::with('user')->latest()->get();
+        // Admin: build filtered query based on GET params
+        if (Auth::user() && Auth::user()->is_admin) {
+            $users = User::orderBy('id')->get();
+
+            $q = Payslip::with('user');
+
+            // search by employee name or email
+            if ($search = $request->query('search')) {
+                $q->whereHas('user', function ($uq) use ($search) {
+                    $uq->whereRaw(
+                        "concat(first_name, ' ', coalesce(middle_name, ''), ' ', last_name) LIKE ?",
+                        ["%{$search}%"]
+                    )->orWhere('email', 'like', "%{$search}%");
+                });
             }
-            
-            return view('payslip.index', compact('payslips', 'users', 'allPayslips'));
+
+            // date range on issue_date
+            if ($from = $request->query('from')) {
+                $q->whereDate('issue_date', '>=', $from);
+            }
+            if ($to = $request->query('to')) {
+                $q->whereDate('issue_date', '<=', $to);
+            }
+
+            // safe sort handling
+            $allowedSorts = ['employee', 'issue_date', 'period_from', 'net_pay'];
+            $sort = $request->query('sort', 'issue_date');
+            $order = $request->query('order', 'desc') === 'asc' ? 'asc' : 'desc';
+
+            if ($sort === 'employee') {
+                // join users to sort by name
+                $q->join('users', 'payslips.user_id', '=', 'users.id')
+                  ->select('payslips.*')
+                  ->orderBy('users.last_name', $order)
+                  ->orderBy('users.first_name', $order);
+            } elseif (in_array($sort, $allowedSorts)) {
+                $q->orderBy($sort, $order);
+            } else {
+                $q->orderBy('issue_date', $order);
+            }
+
+            // fetch results (use paginate(...) if you want pagination)
+            $allPayslips = $q->get();
         }
+
+        return view('payslip.index', compact('payslips', 'users', 'allPayslips'));
+    }
 
     // admin manage (shows form + employees)
     public function manage()
