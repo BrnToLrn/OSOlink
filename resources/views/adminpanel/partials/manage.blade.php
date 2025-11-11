@@ -68,6 +68,8 @@
                 <tr>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Name</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Email</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Job Type</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Hourly Rate</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Status</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Action</th>
                 </tr>
@@ -77,6 +79,15 @@
                     <tr>
                         <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $user->first_name }} {{ $user->middle_name }} {{ $user->last_name }}</td>
                         <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $user->email }}</td>
+
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            {{ $user->job_type ?? '—' }}
+                        </td>
+
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            {{ isset($user->hourly_rate) ? ('CA$' . number_format($user->hourly_rate, 2)) : '—' }}
+                        </td>
+
                         <td class="px-4 py-2 text-center text-sm">
                             <span class="{{ $user->is_active ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
                                 {{ $user->is_active ? 'Active' : 'Inactive' }}

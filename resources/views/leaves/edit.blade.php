@@ -13,7 +13,7 @@
                     </div>
                 </header>
 
-                <form method="POST" action="{{ route('leaves.update', $leave->id) }}" class="mt-6 space-y-6">
+                <form method="POST" action="{{ route('leaves.update', $leave) }}" class="mt-6 space-y-6">
                     @csrf
                     @method('PUT')
 

@@ -114,7 +114,17 @@
                             <!-- Hourly Rate -->
                             <div class="flex-1">
                                 <x-input-label for="hourly_rate" :value="__('Hourly Rate')" />
-                                <x-text-input id="hourly_rate" name="hourly_rate" type="number" step="0.01" min="0" class="mt-1 block w-full" :value="$user->hourly_rate"  />
+                                <div class="relative mt-1">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm text-gray-600 dark:text-gray-300">CA$</span>
+                                    <x-text-input id="hourly_rate"
+                                                name="hourly_rate"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                class="mt-0 block w-full pl-14"
+                                                :value="$user->hourly_rate"
+                                                required />
+                                </div>
                                 <x-input-error class="mt-2" :messages="$errors->get('hourly_rate')" />
                             </div>
                         </div>

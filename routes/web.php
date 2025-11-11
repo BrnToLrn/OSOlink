@@ -82,7 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
 
     // Leaves — shared by admin and employees
-    Route::resource('leaves', LeaveController::class);
+    Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
     Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
     Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
     Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
