@@ -8,6 +8,7 @@ use App\Http\Controllers\DependentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\CashLoanController; 
 
 Route::get('/', function () {
     return view('auth.login');
@@ -74,9 +75,18 @@ Route::middleware('auth')->group(function () {
     Route::resource('leaves', LeaveController::class)->parameters(['leaves' => 'leave']);
     // Leaves Admin actions
     Route::middleware('admin')->group(function () {
-    Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
-    Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
-    Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
+        Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])->name('leaves.approve');
+        Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
+        Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
+    });
+
+    // Cash Loans
+    Route::resource('cashloans', CashLoanController::class)->parameters(['cashloans' => 'cashloan']);
+    // Cash Loans Admin actions
+    Route::middleware('admin')->group(function () {
+        Route::post('cashloans/{cashloan}/activate', [CashLoanController::class, 'activate'])->name('cashloans.activate');
+        Route::post('cashloans/{cashloan}/mark-paid', [CashLoanController::class, 'markPaid'])->name('cashloans.markPaid');
+        Route::post('cashloans/{cashloan}/cancel', [CashLoanController::class, 'cancel'])->name('cashloans.cancel');
     });
 });
 

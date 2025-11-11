@@ -27,6 +27,11 @@
                         Leaves
                     </x-nav-link>
 
+                    <!-- Cash Loans -->
+                    <x-nav-link :href="route('cashloans.index')" :active="request()->routeIs('cashloans.*')">
+                        Cash Loans
+                    </x-nav-link>
+
                     <!-- Payslip -->
                     <x-nav-link :href="route('payslip.index')" :active="request()->routeIs('payslip.*')">
                         Payslip
@@ -121,6 +126,11 @@
 
             <x-responsive-nav-link :href="route('leaves.index')" :active="request()->routeIs('leaves.*')">
                 Leaves
+            </x-responsive-nav-link>
+
+            <!-- Cash Loans -->
+            <x-responsive-nav-link :href="route('cashloans.index')" :active="request()->routeIs('cashloans.*')">
+                Cash Loans
             </x-responsive-nav-link>
 
             <!-- Payslip -->
