@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class TimeLog extends Model
 {
@@ -19,6 +20,7 @@ class TimeLog extends Model
         'hours',
         'status',
         'decline_reason',
+        'approved_by',
     ];
 
     protected $casts = [
@@ -36,13 +38,34 @@ class TimeLog extends Model
         return $this->belongsTo(User::class);
     }
 
-        public function approve()
+    public function approver()
     {
-        $this->update(['status' => 'Approved', 'decline_reason' => null]);
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
+    /**
+     * Approve the time log.
+     */
+    public function approve()
+    {
+        $this->update([
+            'status' => 'Approved',
+            'decline_reason' => null,
+            'approved_by' => Auth::id(), // Record who approved it
+        ]);
+    }
+
+    /**
+     * Decline the time log.
+     *
+     * @param string $reason
+     */
     public function decline($reason)
     {
-        $this->update(['status' => 'Declined', 'decline_reason' => $reason]);
+        $this->update([
+            'status' => 'Declined',
+            'decline_reason' => $reason,
+            'approved_by' => null, // Clear approver if it was previously approved
+        ]);
     }
 }
