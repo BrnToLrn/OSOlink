@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\AuditLog;
+use App\Models\HourlyRateHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class AdminController extends Controller
 {
@@ -82,6 +84,16 @@ class AdminController extends Controller
             'is_admin' => $request->has('is_admin'),
         ]);
 
+        // record hourly rate history (old is null on create)
+        if ($user->hourly_rate !== null) {
+            HourlyRateHistory::create([
+                'user_id' => $user->id,
+                'changed_by' => auth()->id(),
+                'old_hourly_rate' => null,
+                'new_hourly_rate' => $user->hourly_rate,
+            ]);
+        }
+
         $this->logAction('Created User', $user);
 
         return redirect()->route('adminpanel.admin')->with('create_success', 'User created successfully!');
@@ -114,14 +126,57 @@ class AdminController extends Controller
 
     public function show($id)
     {
-        $user = \App\Models\User::findOrFail($id);
-        return view('adminpanel.show', compact('user'));
+        $user = User::findOrFail($id);
+
+        $rateHistory = HourlyRateHistory::with('changer')
+            ->where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('adminpanel.show', compact('user', 'rateHistory'));
     }
     
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
-        $user->update($request->all());
-        return redirect()->route('admin.users.show', $user->id)->with('update_success', 'User updated!');
+        $oldRate = $user->hourly_rate;
+
+        $validated = $request->validate([
+            'bank_name' => 'nullable|string|max:255',
+            'bank_account_number' => 'nullable|string|max:255',
+            'job_type' => 'nullable|string|max:255',
+            'hourly_rate' => 'nullable|numeric|min:0',
+            'is_admin' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        // normalize boolean checkbox
+        $validated['is_admin'] = $request->has('is_admin');
+
+        // update only allowed fields
+        $user->bank_name = $validated['bank_name'] ?? $user->bank_name;
+        $user->bank_account_number = $validated['bank_account_number'] ?? $user->bank_account_number;
+        $user->job_type = $validated['job_type'] ?? $user->job_type;
+        // allow null/empty to remain unchanged if you prefer; here we set if present
+        if ($request->filled('hourly_rate') || $request->hourly_rate === '0' || $request->hourly_rate === 0) {
+            $user->hourly_rate = $validated['hourly_rate'];
+        }
+        $user->is_admin = $validated['is_admin'];
+        $user->save();
+
+        // record hourly rate history when changed
+        $newRate = $user->hourly_rate;
+        if ($oldRate != $newRate) {
+            HourlyRateHistory::create([
+                'user_id' => $user->id,
+                'changed_by' => auth()->id(),
+                'old_rate' => $oldRate,
+                'new_rate' => $newRate,
+            ]);
+        }
+
+        $this->logAction('Updated User', $user, ['updated_fields' => array_keys($validated)]);
+
+        return redirect()->back()->with('update_success', 'User updated.');
     }
 }

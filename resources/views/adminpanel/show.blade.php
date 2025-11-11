@@ -7,7 +7,7 @@
                         User Information
                     </h2>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        View an account's information.
+                        View the user account information.
                     </p>
                 </header>
 
@@ -97,17 +97,19 @@
                             <!-- Bank Name -->
                             <div class="flex-1">
                                 <x-input-label :value="__('Bank Name')" />
-                                <x-text-input class="mt-1 block w-full" type="text" :value="$user->bank_name" />
+                                <x-text-input name="bank_name" class="mt-1 block w-full" type="text" :value="old('bank_name', $user->bank_name)" />
+                                <x-input-error class="mt-2" :messages="$errors->get('bank_name')" />
                             </div>
                             <!-- Bank Account Number -->
                             <div class="flex-1">
                                 <x-input-label :value="__('Bank Account Number')" />
-                                <x-text-input class="mt-1 block w-full" type="text" :value="$user->bank_account_number" />
+                                <x-text-input name="bank_account_number" class="mt-1 block w-full" type="text" :value="old('bank_account_number', $user->bank_account_number)" />
+                                <x-input-error class="mt-2" :messages="$errors->get('bank_account_number')" />
                             </div>
                             <!-- Job Type -->
                             <div class="flex-1">
                                 <x-input-label for="job_type" :value="__('Job Type')" />
-                                <x-text-input id="job_type" name="job_type" type="text" class="mt-1 block w-full" :value="$user->job_type" />
+                                <x-text-input id="job_type" name="job_type" type="text" class="mt-1 block w-full" :value="old('job_type', $user->job_type)" />
                                     <x-input-error class="mt-2" :messages="$errors->get('job_type')" />
                             </div>
 
@@ -122,7 +124,7 @@
                                                 step="0.01"
                                                 min="0"
                                                 class="mt-0 block w-full pl-14"
-                                                :value="$user->hourly_rate"
+                                                :value="old('hourly_rate', $user->hourly_rate)"
                                                 required />
                                 </div>
                                 <x-input-error class="mt-2" :messages="$errors->get('hourly_rate')" />
@@ -148,6 +150,49 @@
                         </div>
                     </form>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div>
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+            <div class="p-4 sm:p-8 bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+                <header>
+                    <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+                        Hourly Rate History
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        View the user's hourly rate changes.
+                    </p>
+                </header>
+                <!-- ADD HERE -->
+                @if (isset($rateHistory) && $rateHistory->count())
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="rounded-lg overflow-hidden w-full divide-y divide-gray-300 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Date</th>
+                                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Changed By</th>
+                                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Old Rate</th>
+                                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">New Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-gray-200 dark:bg-gray-900">
+                                @foreach($rateHistory as $h)
+                                    <tr class="bg-white dark:bg-gray-900">
+                                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $h->created_at->format('F j, Y H:i') }}</td>
+                                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                                            {{ optional($h->changer)->first_name ? optional($h->changer)->first_name . ' ' . optional($h->changer)->last_name : 'System' }}
+                                        </td>
+                                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">CA${{ number_format($h->old_rate ?? 0, 2) }}</td>
+                                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">CA${{ number_format($h->new_rate ?? 0, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">No hourly rate changes recorded for this user.</p>
+                @endif
             </div>
         </div>
     </div>
