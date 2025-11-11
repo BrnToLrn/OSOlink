@@ -89,6 +89,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])->name('leaves.reject');
         Route::post('/leaves/{leave}/pending', [LeaveController::class, 'pending'])->name('leaves.pending');
     });
+
+    // Cash Loans
+    Route::resource('cashloans', CashLoanController::class)->parameters(['cashloans' => 'cashloan']);
+    // Cash Loans Admin actions
+    Route::middleware('admin')->group(function () {
+        Route::post('cashloans/{cashloan}/activate', [CashLoanController::class, 'activate'])->name('cashloans.activate');
+        Route::post('cashloans/{cashloan}/mark-paid', [CashLoanController::class, 'markPaid'])->name('cashloans.markPaid');
+        Route::post('cashloans/{cashloan}/cancel', [CashLoanController::class, 'cancel'])->name('cashloans.cancel');
+    });
 });
 
 // Admin panel routes
