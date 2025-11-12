@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\AuditLog;
 use App\Models\HourlyRateHistory;
+use App\Models\Payroll; // <--- add this
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -56,8 +57,9 @@ class AdminController extends Controller
             ->paginate(10, ['*'], 'logs_page');
 
         $users = $query->paginate(10)->withQueryString();
+        $payrolls = Payroll::orderBy('created_at', 'desc')->get(); // add this
 
-        return view('adminpanel.admin', compact('users', 'logs'));
+        return view('adminpanel.admin', compact('users', 'logs', 'payrolls')); // pass $payrolls
     }
 
     public function store(Request $request)

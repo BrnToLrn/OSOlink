@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Payroll extends Model
 {
@@ -14,14 +15,13 @@ class Payroll extends Model
     protected $fillable = [
         'period_from',
         'period_to',
-        'pay_date',
         'total_amount',
+        'status',
     ];
 
     protected $casts = [
         'period_from' => 'date',
         'period_to'   => 'date',
-        'pay_date'   => 'date',
     ];
 
     public function user()
@@ -33,5 +33,10 @@ class Payroll extends Model
     public function payslip()
     {
         return $this->hasOne(\App\Models\Payslip::class, 'payroll_id');
+    }
+
+    public function payslips(): HasMany
+    {
+        return $this->hasMany(Payslip::class);
     }
 }

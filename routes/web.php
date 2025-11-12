@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('payrolls/create', [\App\Http\Controllers\PayrollController::class, 'create'])->name('payrolls.create');
         Route::post('payrolls/generate', [\App\Http\Controllers\PayrollController::class, 'generate'])->name('payrolls.generate');
+        Route::post('payrolls/batch', [\App\Http\Controllers\PayrollController::class, 'batchCreate'])->name('payrolls.batch');
     });
 
     // Leaves
