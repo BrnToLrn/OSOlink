@@ -76,10 +76,20 @@ Route::middleware('auth')->group(function () {
     });
 
     //Payroll
-    Route::prefix('admin')->name('admin.')->group(function () {
+    Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('payrolls/create', [\App\Http\Controllers\PayrollController::class, 'create'])->name('payrolls.create');
         Route::post('payrolls/generate', [\App\Http\Controllers\PayrollController::class, 'generate'])->name('payrolls.generate');
         Route::post('payrolls/batch', [\App\Http\Controllers\PayrollController::class, 'batchCreate'])->name('payrolls.batch');
+
+        // Payslips listing for a payroll (JSON for the modal / CSV generator)
+        Route::get('payrolls/{payroll}/payslips', [\App\Http\Controllers\PayrollController::class, 'payslips'])->name('payrolls.payslips');
+
+        // Export CSV (server-side stream with totals)
+        Route::get('payrolls/{payroll}/export', [\App\Http\Controllers\PayrollController::class, 'export'])->name('payrolls.export');
+
+        // Update status and destroy
+        Route::patch('payrolls/{payroll}/status', [\App\Http\Controllers\PayrollController::class, 'updateStatus'])->name('payrolls.updateStatus');
+        Route::delete('payrolls/{payroll}', [\App\Http\Controllers\PayrollController::class, 'destroy'])->name('payrolls.destroy');
     });
 
     // Leaves

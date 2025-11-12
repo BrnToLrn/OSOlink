@@ -66,6 +66,15 @@
 
                             <div class="!important; ml-1">
                                 {{ Auth::user()->first_name }} {{ Auth::user()->middle_name }} {{ Auth::user()->last_name }}
+                                @if(Auth::user()->is_admin)
+                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100">
+                                        Admin
+                                    </span>
+                                @else
+                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                        User
+                                    </span>
+                                @endif
                             </div>
 
                             <div class="ms-1">
@@ -161,6 +170,15 @@
                 </div>
                 <div class="font-medium text-base text-gray-800 dark:text-gray-200">
                     {{ Auth::user()->first_name }} {{ Auth::user()->middle_name }} {{ Auth::user()->last_name }}
+                    @if(Auth::user()->is_admin)
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100">
+                            Admin
+                        </span>
+                    @else
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                            User
+                        </span>
+                    @endif
                 </div>
                 <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
             </div>
