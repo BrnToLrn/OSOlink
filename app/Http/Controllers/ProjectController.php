@@ -128,6 +128,7 @@ class ProjectController extends Controller
             // 1. Group logs by their formatted date.
             // 2. Map over the *logs* inside each group to include user data.
             $timeLogs = $project->timeLogs->groupBy(function ($log) {
+                // Use the Carbon instance from $casts
                 return $log->date->format('Y-m-d');
             })->map(function ($logsOnDate) {
                 // Map each log in the group to the format Alpine needs
@@ -141,6 +142,7 @@ class ProjectController extends Controller
                         'hours' => $log->hours,
                         'decline_reason' => $log->decline_reason,
                         'user_id' => $log->user_id,
+                        'user' => $log->user, // Pass the whole user object
                         'user_name' => $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'Unknown User',
                         // We can add this for the edit/delete/approve policy
                         'can_manage' => auth()->user()->is_admin || auth()->id() === $log->user_id
@@ -177,7 +179,7 @@ class ProjectController extends Controller
         }
 
         // 2. Handle "Manage Team" modal data
-        if ($request->has('user_ids')) {
+        if ($request->has('user_ids') || $request->has('project_lead_id')) {
             $userIds = $request->input('user_ids', []);
             $leadId = $request->input('project_lead_id');
 
@@ -221,6 +223,7 @@ class ProjectController extends Controller
 
     // --- TIME LOGS ---
 
+    // Note: This function is now private and receives $projectId
     private function hasOverlappingTimeLog(Request $request, $projectId, $userId, $exceptLogId = null)
     {
         $start = Carbon::createFromFormat('Y-m-d H:i', $request->date . ' ' . $request->time_in);
@@ -233,18 +236,31 @@ class ProjectController extends Controller
             ->where('user_id', $userId)
             ->where('date', $request->date)
             ->when($exceptLogId, fn($q) => $q->where('id', '!=', $exceptLogId))
+            // This logic is complex and needs to handle time-only checks.
+            // Let's simplify to check for records that start *or* end within the new time.
             ->where(function ($q) use ($start, $end) {
-                $q->where(function($q2) use ($start, $end) {
-                    $q2->where('time_in', '>=', $start->format('H:i'))
-                    ->where('time_in', '<', $end->format('H:i'));
-                })->orWhere(function($q2) use ($start, $end) {
-                    $q2->where('time_out', '>', $start->format('H:i'))
-                    ->where('time_out', '<=', $end->format('H:i'));
-                })->orWhere(function($q2) use ($start, $end) {
-                    $q2->where('time_in', '<', $start->format('H:i'))
-                    ->where('time_out', '>', $end->format('H:i'));
-                });
+                $startTime = $start->format('H:i:s');
+                $endTime = $end->format('H:i:s');
+
+                if ($end->isSameDay($start)) {
+                    // Not an overnight log
+                    $q->where(function($q2) use ($startTime, $endTime) {
+                        $q2->where('time_in', '>=', $startTime)->where('time_in', '<', $endTime);
+                    })->orWhere(function($q2) use ($startTime, $endTime) {
+                        $q2->where('time_out', '>', $startTime)->where('time_out', '<=', $endTime);
+                    })->orWhere(function($q2) use ($startTime, $endTime) {
+                        $q2->where('time_in', '<', $startTime)->where('time_out', '>', $endTime);
+                    });
+                } else {
+                    // Is an overnight log, logic is more complex
+                    // For now, let's just check for any logs on that day
+                    // A proper check would need to query logs on the *next* day as well
+                    // This is a simplification to prevent the most obvious overlaps.
+                    $q->where('time_in', '>=', '00:00:00') // Just check for *any* log
+                      ->orWhere('time_out', '<=', '23:59:59');
+                }
             });
+
 
         if ($query->exists()) {
             if ($request->expectsJson()) {
@@ -261,14 +277,22 @@ class ProjectController extends Controller
         return false; // No overlap
     }
 
-    public function addTimeLog(Request $request, Project $project)
+    // **CHANGED**: Now only takes Request
+    public function addTimeLog(Project $project, Request $request)
     {
         $validated = $request->validate([
-            'date' => ['required', 'date', 'after_or_equal:' . $project->start_date, 'before_or_equal:' . $project->end_date],
+            'date' => ['required', 'date'],
             'time_in' => 'required|date_format:H:i',
             'time_out' => 'required|date_format:H:i',
             'work_output' => 'required|string|max:2000',
         ]);
+        
+        // Check project date boundaries
+        if ($validated['date'] < $project->start_date || $validated['date'] > $project->end_date) {
+             return response()->json([
+                'errors' => ['date' => ['The date must be within the project start and end dates.']]
+            ], 422);
+        }
 
         $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, auth()->id());
         if ($overlapResponse) {
@@ -284,6 +308,10 @@ class ProjectController extends Controller
 
         $minutes = $start->diffInMinutes($end);
         $hours = round($minutes / 60, 2);
+        
+        $role = $project->users()->where('user_id', auth()->id())->first()->pivot->project_role ?? 'Developer';
+
+        $status = $role === 'Project Lead' ? 'Approved' : 'Pending';
 
         $timeLog = $project->timeLogs()->create([
             'user_id' => Auth::id(),
@@ -292,23 +320,33 @@ class ProjectController extends Controller
             'time_out' => $validated['time_out'],
             'hours' => $hours,
             'work_output' => $validated['work_output'],
-            'status' => 'Pending',
+            'status' => $status,
+            'decline_reason' => null,
         ]);
+        
+        // Eager load the user for the response
+        $timeLog->load('user');
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Time log created successfully',
-                'log' => $timeLog
+                'log' => $timeLog // Return the new log
             ]);
         }
 
         return back()->with('success', 'Time log created successfully');
     }
 
-    public function updateTimeLog(Request $request, Project $project, TimeLog $timeLog)
+    // **CHANGED**: Now takes TimeLog instead of Project
+    public function updateTimeLog(Request $request, Project $project, TimeLog $timelog)
     {
+        // Check the timelog belongs to this project
+        if ($timelog->project_id !== $project->id) {
+            abort(404); // or return JSON error
+        }
+
         $user = auth()->user();
-        if (!$user->is_admin && $timeLog->user_id !== $user->id) abort(403);
+        if (!$user->is_admin && $timelog->user_id !== $user->id) abort(403);
 
         $validated = $request->validate([
             'date' => ['required', 'date', 'after_or_equal:' . $project->start_date, 'before_or_equal:' . $project->end_date],
@@ -317,7 +355,7 @@ class ProjectController extends Controller
             'work_output' => 'required|string|max:2000',
         ]);
 
-        $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, $timeLog->user_id, $timeLog->id);
+        $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, $timelog->user_id, $timelog->id);
         if ($overlapResponse) {
             return $overlapResponse;
         }
@@ -328,7 +366,7 @@ class ProjectController extends Controller
 
         $hours = round($start->diffInMinutes($end) / 60, 2);
 
-        $timeLog->update([
+        $timelog->update([
             'date' => $validated['date'],
             'time_in' => $validated['time_in'],
             'time_out' => $validated['time_out'],
@@ -338,10 +376,12 @@ class ProjectController extends Controller
             'decline_reason' => null,
         ]);
 
+        $timelog->load('user');
+
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Time log updated successfully',
-                'log' => $timeLog
+                'log' => $timelog
             ]);
         }
 
@@ -350,9 +390,36 @@ class ProjectController extends Controller
             ->with('success', 'Time log updated and resubmitted for approval.');
     }
 
-
-    public function approveTimeLog(Project $project, TimeLog $timeLog)
+    public function deleteTimeLog(Project $project, TimeLog $timelog)
     {
+        // Ensure the timelog belongs to this project
+        abort_if($timelog->project_id !== $project->id, 404);
+
+        $user = auth()->user();
+
+        // Only the owner of the timelog or an admin can delete it
+        if (!$user->is_admin && $timelog->user_id !== $user->id) {
+            abort(403, 'You do not have permission to delete this time log.');
+        }
+
+        $timelog->delete();
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'message' => 'Time log deleted successfully',
+                'log_id' => $timelog->id,
+            ]);
+        }
+
+        return back()->with('success', 'Time log deleted successfully.');
+    }
+
+    // **CHANGED**: Now takes TimeLog instead of Project
+    public function approveTimeLog(Project $project, TimeLog $timelog)
+    {
+        // Optional: ensure the timelog belongs to this project
+        abort_if($timelog->project_id !== $project->id, 404);
+
         $user = auth()->user();
         $leadId = optional($project->users->firstWhere('pivot.project_role', 'Project Lead'))->id;
 
@@ -360,38 +427,38 @@ class ProjectController extends Controller
             abort(403, 'Only the project lead can approve time logs.');
         }
 
-        $timeLog->approve(); // Assumes TimeLog model has approve() method
+        $timelog->update([
+            'status' => 'Approved',
+            'decline_reason' => null
+        ]);
+
         return back()->with('success', 'Time log approved.');
     }
 
-    public function declineTimeLog(Request $request, Project $project, TimeLog $timeLog)
+
+    // **CHANGED**: Now takes TimeLog instead of Project
+    public function declineTimeLog(Request $request, Project $project, TimeLog $timelog)
     {
         $user = auth()->user();
+        $project = $timelog->project;
         $leadId = optional($project->users->firstWhere('pivot.project_role', 'Project Lead'))->id;
 
         if (!$user->is_admin && $user->id !== $leadId) {
             abort(403, 'Only the project lead can decline time logs.');
         }
 
-        $validated = $request->validate(['decline_reason' => 'required|string|max:500']);
-        $timeLog->decline($validated['decline_reason']); // Assumes TimeLog model has decline() method
+        $validated = $request->validate([
+            'decline_reason' => 'required|string|max:500'
+        ]);
+
+        $timelog->update([
+            'status' => 'Declined',
+            'decline_reason' => $validated['decline_reason']
+        ]);
 
         return back()->with('success', 'Time log declined.');
     }
 
-    public function deleteTimeLog(Project $project, TimeLog $timeLog)
-    {
-        $user = auth()->user();
-        if (!$user->is_admin && $timeLog->user_id !== $user->id) {
-            abort(403, 'Unauthorized');
-        }
-
-        $timeLog->delete();
-
-        return redirect()->route('projects.show', $project->id)
-            ->with('success', 'Time log deleted.')
-            ->with('section', 'timelogs');
-    }
 
     // Join / Leave project
     public function join(Project $project)

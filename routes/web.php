@@ -103,17 +103,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/payslip/calc-hours', [PayslipController::class, 'calculateHours'])->name('payslip.calculateHours');
     });
 
-<<<<<<< HEAD
-    /**
-     * =======================
-     * PAYROLL (admin)
-     * =======================
-     */
-    Route::prefix('admin')->name('admin.')->group(function () {
-        Route::get('payrolls/create', [PayrollController::class, 'create'])->name('payrolls.create');
-        Route::post('payrolls/generate', [PayrollController::class, 'generate'])->name('payrolls.generate');
-        Route::post('payrolls/batch', [PayrollController::class, 'batchCreate'])->name('payrolls.batch');
-=======
     //Payroll
     Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('payrolls/create', [\App\Http\Controllers\PayrollController::class, 'create'])->name('payrolls.create');
@@ -129,7 +118,6 @@ Route::middleware('auth')->group(function () {
         // Update status and destroy
         Route::patch('payrolls/{payroll}/status', [\App\Http\Controllers\PayrollController::class, 'updateStatus'])->name('payrolls.updateStatus');
         Route::delete('payrolls/{payroll}', [\App\Http\Controllers\PayrollController::class, 'destroy'])->name('payrolls.destroy');
->>>>>>> f944f14beeaa7d0a1c78fa083f59ec6ec4276df8
     });
 
     /**

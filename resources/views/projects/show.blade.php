@@ -265,7 +265,9 @@
                                 timeLogs: {{ json_encode($timeLogs) }},
                                 currentUserId: {{ auth()->id() }},
                                 isProjectLead: {{ auth()->user()->is_admin || auth()->id() === $projectLeadId ? 'true' : 'false' }},
-                                projectId: {{ $project->id }}
+                                projectId: {{ $project->id }},
+                                projectStart: '{{ $project->start_date }}',
+                                projectEnd: '{{ $project->end_date }}'
                             })" 
                             class="space-y-4"
                         >
@@ -273,7 +275,19 @@
                             <!-- Month navigation -->
                             <div class="flex items-center justify-between mb-4">
                                 <button @click="prevMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded">Prev</button>
-                                <h2 class="text-lg font-semibold dark:text-gray-100" x-text="monthName + ' ' + year"></h2>
+                                <h2 class="text-lg font-semibold dark:text-gray-100">
+                                    <span x-text="monthName + ' ' + year"></span>
+                                    <!-- Always show user's total -->
+                                    <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
+                                        Your total hours: <span x-text="totalUserHoursThisMonth"></span>h
+                                    </span>
+                                    <!-- Show team total only if user is a project lead -->
+                                    <template x-if="isProjectLead">
+                                        <span class="ml-2 text-sm text-blue-600 dark:text-blue-400">
+                                            — Team: <span x-text="totalTeamHoursThisMonth"></span>h —
+                                        </span>
+                                    </template>
+                                </h2>
                                 <button @click="nextMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded">Next</button>
                             </div>
 
@@ -334,7 +348,27 @@
                                     <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                                         
                                         <!-- List of existing logs -->
-                                        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Time Logs</h2>
+                                        <!-- Header + Filter Controls (on the same line) -->
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Time Logs</h2>
+
+                                            <div class="flex items-center gap-2">
+                                                <button 
+                                                    @click="logFilter = 'all'"
+                                                    :class="logFilter === 'all'
+                                                        ? 'bg-indigo-600 text-white px-2 py-1 rounded text-sm'
+                                                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-sm'">
+                                                    All
+                                                </button>
+                                                <button 
+                                                    @click="logFilter = 'mine'"
+                                                    :class="logFilter === 'mine'
+                                                        ? 'bg-indigo-600 text-white px-2 py-1 rounded text-sm'
+                                                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-sm'">
+                                                    My Logs
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div x-show="selectedLogs.length === 0" class="text-gray-500 dark:text-gray-400 text-sm">
                                             No time logs for this day.
                                         </div>
@@ -352,8 +386,18 @@
                                                         
                                                         <!-- Right Side: Edit/Delete Buttons -->
                                                         <div x-show="log.user_id == currentUserId || isProjectLead" class="flex gap-2 items-center">
-                                                            <button @click="editLog(log)" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Edit</button>
-                                                            <button @click="deleteLog(log.id)" class="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
+                                                            <button 
+                                                                x-show="log.user_id === currentUserId" 
+                                                                @click="editLog(log)" 
+                                                                class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                                                Edit
+                                                            </button>
+                                                            <button 
+                                                                x-show="log.status === 'Pending' && log.user_id === currentUserId" 
+                                                                @click="deleteLog(log.id)" 
+                                                                class="text-xs text-red-600 dark:text-red-400 hover:underline">
+                                                                Delete
+                                                            </button>
                                                         </div>
                                                     </div>
 
@@ -374,17 +418,17 @@
                                                     
                                                     <!-- Approval/Decline buttons for Lead -->
                                                     <div x-show="isProjectLead && log.status === 'Pending'" class="flex gap-2 mt-3">
+                                                        <!-- Approve -->
                                                         <form :action="`/projects/${projectId}/timelogs/${log.id}/approve`" method="POST">
                                                             @csrf
-                                                            @method('PUT')
                                                             <x-primary-button class="text-xs !py-1 !px-2 bg-green-600">Approve</x-primary-button>
                                                         </form>
-                                                        <!-- Decline Form (in a small Alpine component to show/hide) -->
+
+                                                        <!-- Decline -->
                                                         <div x-data="{ showDecline: false }">
-                                                            <x-primary-button @click="showDecline = !showDecline" class="!text-xs !py-1 !px-2 !bg-red-600 hover:!bg-red-700 dark:!bg-red-600 dark:hover:!bg-red-700 dark:!text-white">DECLINE</x-primary-button>
+                                                            <x-primary-button @click="showDecline = !showDecline" class="!text-xs !py-1 !px-2 !bg-red-600">Decline</x-primary-button>
                                                             <form x-show="showDecline" :action="`/projects/${projectId}/timelogs/${log.id}/decline`" method="POST" class="mt-2 flex gap-1">
                                                                 @csrf
-                                                                @method('PUT')
                                                                 <x-text-input type="text" name="decline_reason" placeholder="Reason..." required class="!text-xs !py-1 w-full"/>
                                                                 <x-secondary-button type="submit" class="!text-xs !py-1 !px-2">Go</x-secondary-button>
                                                             </form>
@@ -408,6 +452,7 @@
                                             @csrf
                                             <input type="hidden" name="_method" x-bind:value="formMethod">
                                             <input type="hidden" name="date" x-bind:value="selectedDate">
+                                            <input type="hidden" name="project_id" :value="projectId">
                                             
                                             <div class="space-y-3">
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -451,10 +496,36 @@
                                 isProjectLead: data.isProjectLead,
                                 projectId: data.projectId,
                                 selectedDateFormatted: '',
+                                logFilter: 'all',
+                                projectStart: data.projectStart,
+                                projectEnd: data.projectEnd,
+                                
+                                isDateAllowed(dateStr) {
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0); // normalize to start of today
+
+                                    const date = new Date(dateStr);
+                                    date.setHours(0, 0, 0, 0); // normalize to start of that day
+
+                                    const start = new Date(this.projectStart);
+                                    start.setHours(0, 0, 0, 0);
+                                    const end = new Date(this.projectEnd);
+                                    end.setHours(0, 0, 0, 0);
+
+                                    return date >= start && date <= end && date <= today;
+                                },
 
                                 showModal: false,
                                 selectedDate: null,      // 'YYYY-MM-DD'
-                                selectedLogs: [],      // Array of logs for the selected date
+                                rawSelectedLogs: [],
+
+                                get selectedLogs() {
+                                    if (this.logFilter === 'mine') {
+                                        return this.rawSelectedLogs.filter(log => log.user_id === this.currentUserId);
+                                    }
+                                    return this.rawSelectedLogs;
+                                },
+                                    // Array of logs for the selected date
                                 
                                 // Form models
                                 formTitle: 'Add Time Log',
@@ -481,14 +552,58 @@
                                 // Get all logs for a specific day
                                 getLogs(date) {
                                     const dateStr = this.getFullDateStr(date);
-                                    return this.timeLogs[dateStr] || [];
+                                    let logs = this.timeLogs[dateStr] || [];
+
+                                    // If user is not project lead/admin, only show their own logs
+                                    if (!this.isProjectLead) {
+                                        logs = logs.filter(log => log.user_id === this.currentUserId);
+                                    }
+
+                                    return logs;
+                                },
+
+                                get totalUserHoursThisMonth() {
+                                    let total = 0;
+
+                                    // Loop through all logs
+                                    for (const [dateStr, logs] of Object.entries(this.timeLogs)) {
+                                        const dateObj = new Date(dateStr);
+                                        if (dateObj.getFullYear() === this.year && dateObj.getMonth() === this.month) {
+                                            logs.forEach(log => {
+                                                // Only count current user's logs, and skip declined ones
+                                                if (log.user_id === this.currentUserId && log.status !== 'Declined') {
+                                                    total += parseFloat(log.hours);
+                                                }
+                                            });
+                                        }
+                                    }
+                                    return total.toFixed(2);
+                                },
+
+                                // Total hours for *all users* (for leads)
+                                get totalTeamHoursThisMonth() {
+                                    if (!this.isProjectLead) return null; // skip if not a lead
+
+                                    let total = 0;
+                                    for (const [dateStr, logs] of Object.entries(this.timeLogs)) {
+                                        const dateObj = new Date(dateStr);
+                                        if (dateObj.getFullYear() === this.year && dateObj.getMonth() === this.month) {
+                                            logs.forEach(log => {
+                                                if (log.status !== 'Declined') {
+                                                    total += parseFloat(log.hours);
+                                                }
+                                            });
+                                        }
+                                    }
+                                    return total.toFixed(2);
                                 },
 
                                 // Get total hours for a specific day
                                 getTotalHours(date) {
                                     const logs = this.getLogs(date);
                                     if (!logs.length) return 0;
-                                    // Sum only *approved* or *pending* hours
+
+                                    // Sum only *approved* or *pending* hours (skip declined)
                                     return logs.reduce((total, log) => {
                                         return (log.status !== 'Declined') ? total + parseFloat(log.hours) : total;
                                     }, 0).toFixed(2);
@@ -496,6 +611,12 @@
 
                                 // Get class for the calendar day
                                 getDayClass(date) {
+                                    const dateStr = this.getFullDateStr(date);
+                                    // Gray out invalid (non-loggable) dates
+                                    if (!this.isDateAllowed(dateStr)) {
+                                        return 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60';
+                                    }
+
                                     const logs = this.getLogs(date);
                                     if (logs.length === 0) return 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600';
                                     if (logs.some(l => l.status === 'Pending')) return 'bg-yellow-200 dark:bg-yellow-600 hover:bg-yellow-300';
@@ -504,16 +625,31 @@
                                     return 'bg-blue-100 dark:bg-blue-800 hover:bg-blue-200'; // Mixed statuses
                                 },
                                 
+                                getCurrentTime() {
+                                    const now = new Date();
+                                    const hours = String(now.getHours()).padStart(2, '0');
+                                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                                    return `${hours}:${minutes}`;
+                                },
+
                                 // Open the modal and set its state
                                 openModal(date) {
                                     const dateStr = this.getFullDateStr(date);
+
+                                    if (!this.isDateAllowed(dateStr)) {
+                                        alert('You cannot log time outside the project duration or beyond today.');
+                                        return;
+                                    }
+
                                     this.selectedDate = dateStr;
-                                    this.selectedDateFormatted = new Date(this.year, this.month, date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                                    this.selectedLogs = this.timeLogs[dateStr] || [];
-                                    this.resetForm(); // Set up the "Add" form
+                                    this.selectedDateFormatted = new Date(this.year, this.month, date)
+                                        .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                                    this.rawSelectedLogs = this.timeLogs[dateStr] || [];
+                                    this.resetForm();
                                     this.showModal = true;
+                                    this.logFilter = 'all';
                                 },
-                                
+                                                                
                                 closeModal() {
                                     this.showModal = false;
                                     this.selectedDate = null;
@@ -528,7 +664,7 @@
                                     this.formAction = `/projects/${this.projectId}/timelogs`;
                                     this.formMethod = 'POST';
                                     this.formTimeIn = '';
-                                    this.formTimeOut = '';
+                                    this.formTimeOut = this.getCurrentTime();;
                                     this.formWorkOutput = '';
                                     this.editingLogId = null;
                                 },
@@ -539,8 +675,8 @@
                                     this.formButtonText = 'Update';
                                     this.formAction = `/projects/${this.projectId}/timelogs/${log.id}`;
                                     this.formMethod = 'PUT';
-                                    this.formTimeIn = log.time_in;
-                                    this.formTimeOut = log.time_out;
+                                    this.formTimeIn = log.time_in.substring(0, 5);
+                                    this.formTimeOut = log.time_out.substring(0, 5);
                                     this.formWorkOutput = log.work_output;
                                     this.editingLogId = log.id;
                                 },
@@ -558,15 +694,19 @@
                                         return;
                                     }
                                     
-                                    formData.append('_method', this.formMethod);
-
                                     fetch(this.formAction, {
-                                        method: 'POST',
+                                        method: this.formMethod, // PUT
                                         headers: {
                                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                                             'Accept': 'application/json',
+                                            'Content-Type': 'application/json'
                                         },
-                                        body: formData
+                                        body: JSON.stringify({
+                                            date: this.selectedDate,
+                                            time_in: this.formTimeIn,
+                                            time_out: this.formTimeOut,
+                                            work_output: this.formWorkOutput
+                                        })
                                     })
                                     .then(response => {
                                         if (!response.ok) {
@@ -626,7 +766,7 @@
                                         this.month = 11;
                                         this.year -= 1;
                                     } else {
-                                        this.month -= 1;
+                                        this.month -= 1;    
                                     }
                                 },
 
