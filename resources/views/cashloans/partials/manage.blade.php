@@ -53,7 +53,7 @@
                         </td>
 
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            {{ isset($loan->amount) ? number_format((float)$loan->amount, 2) : '0.00' }}
+                            CA$ {{ number_format((float)$loan->amount, 2) }}
                         </td>
 
                         <td class="px-4 py-2 text-center font-medium {{ $statusClass }}">
@@ -75,12 +75,11 @@
                                         </button>
                                     </form>
                                 @else
-                                    <a aria-disabled="true" title="Edit disabled for non-pending loans"
-                                       class="text-green-600 dark:text-green-400 opacity-40 cursor-not-allowed pointer-events-none select-none hover:no-underline">
+                                    <a aria-disabled="true"
+                                       class="text-green-600 dark:text-green-400 opacity-40 cursor-not-allowed pointer-events-none select-none">
                                         Edit
                                     </a>
                                     <button type="button" disabled
-                                            title="Delete disabled for non-pending loans"
                                             class="text-red-600 dark:text-red-400 opacity-40 cursor-not-allowed select-none">
                                         Delete
                                     </button>

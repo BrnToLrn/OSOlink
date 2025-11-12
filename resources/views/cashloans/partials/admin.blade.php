@@ -91,7 +91,7 @@
                         </td>
 
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            {{ isset($loan->amount) ? number_format((float)$loan->amount, 2) : '0.00' }}
+                            CA$ {{ number_format((float)($loan->amount ?? 0), 2) }}
                         </td>
 
                         <td class="px-4 py-2 text-center">

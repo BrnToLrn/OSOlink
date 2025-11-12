@@ -28,7 +28,7 @@
                         </div>
 
                         <div class="flex-1">
-                            <x-input-label for="amount" :value="__('Amount (CA$)')" />
+                            <x-input-label for="amount" :value="__('Amount')" />
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
                                 <x-text-input id="amount" name="amount" type="number" step="0.01" min="0"
