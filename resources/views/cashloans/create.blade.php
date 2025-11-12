@@ -16,24 +16,30 @@
                 <form method="POST" action="{{ route('cashloans.store') }}" class="mt-6 space-y-6">
                     @csrf
 
-                    <!-- Date Requested & Amount (mirrors start/end date layout) -->
+                    <!-- Date Requested & Amount -->
                     <div class="flex items-center gap-4 mt-4">
                         <div class="flex-1">
                             <x-input-label for="date_requested" :value="__('Date Requested')" />
-                            <x-text-input id="date_requested" name="date_requested" type="date" class="mt-1 block w-full"
-                                :value="old('date_requested')" required />
+                            <x-text-input id="date_requested" name="date_requested" type="date"
+                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
+                                :value="old('date_requested', now()->toDateString())"
+                                readonly required />
                             <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
                         </div>
 
                         <div class="flex-1">
-                            <x-input-label for="amount" :value="__('Amount')" />
-                            <x-text-input id="amount" name="amount" type="number" step="0.01" min="0" class="mt-1 block w-full"
-                                :value="old('amount')" required />
+                            <x-input-label for="amount" :value="__('Amount (CA$)')" />
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
+                                <x-text-input id="amount" name="amount" type="number" step="0.01" min="0"
+                                    class="mt-1 block w-full pl-14"
+                                    :value="old('amount')" required />
+                            </div>
                             <x-input-error class="mt-2" :messages="$errors->get('amount')" />
                         </div>
                     </div>
 
-                    <!-- Remarks (mirrors Reason of Leave) -->
+                    <!-- Remarks -->
                     <div>
                         <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
                         <x-text-input id="remarks" name="remarks" type="text" class="mt-1 block w-full"
@@ -41,7 +47,7 @@
                         <x-input-error class="mt-2" :messages="$errors->get('remarks')" />
                     </div>
 
-                    <!-- Type (mirrors Type of Leave) -->
+                    <!-- Type & Status -->
                     <div class="flex items-center gap-4 mt-4">
                         <div class="flex-1">
                             <x-input-label for="type" :value="__('Type of Loan')" />
@@ -57,7 +63,6 @@
                             <x-input-error class="mt-2" :messages="$errors->get('type')" />
                         </div>
 
-                        <!-- Status (disabled like in leaves/create) -->
                         <div class="flex-1">
                             <x-input-label for="status" :value="__('Status')" />
                             <x-text-input id="status" name="status" type="text"
@@ -77,4 +82,22 @@
             </div>
         </div>
     </div>
+
+    <!-- Optional: refresh visible date after midnight if the tab stays open -->
+    <script>
+        (function () {
+            const dateInput = document.getElementById('date_requested');
+            if (!dateInput) return;
+
+            function setToday() {
+                const d = new Date();
+                const v = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (dateInput.value !== v) dateInput.value = v;
+            }
+            setToday();
+            const now = new Date();
+            const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
+            setTimeout(() => setToday(), nextMidnight - now);
+        })();
+    </script>
 </x-app-layout>

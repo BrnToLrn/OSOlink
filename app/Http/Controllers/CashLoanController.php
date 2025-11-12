@@ -12,6 +12,11 @@ class CashLoanController extends Controller
 {
     protected array $statuses = ['Pending','Approved','Rejected','Active','Fully Paid','Cancelled'];
 
+    private function isPending(CashLoan $loan): bool
+    {
+        return strcasecmp((string)$loan->status, 'Pending') === 0;
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -70,18 +75,23 @@ class CashLoanController extends Controller
 
         $data = $request->validate([
             'user_id'        => ['nullable','exists:users,id'],
-            'date_requested' => ['required','date'],
+            'date_requested' => ['nullable','date'],
             'amount'         => ['required','numeric','min:0.01'],
             'type'           => ['required','string','max:100'],
             'status'         => [$auth->is_admin ? 'required' : 'sometimes','string','max:50', Rule::in($this->statuses)],
             'remarks'        => ['nullable','string'],
         ]);
 
+        // Force today's date
+        $data['date_requested'] = now()->toDateString();
+
         if (!$auth->is_admin) {
             $data['user_id'] = $auth->id;
             $data['status']  = 'Pending';
         } else {
-            $data['user_id'] = $request->filled('user_id') ? (int)$request->input('user_id') : $auth->id;
+            $data['user_id'] = $request->filled('user_id')
+                ? (int)$request->input('user_id')
+                : $auth->id;
         }
 
         CashLoan::create($data);
@@ -101,14 +111,13 @@ class CashLoanController extends Controller
     {
         $user = Auth::user();
 
-        // Admin: always; User: owner can edit regardless of status
-        $canEdit = $user->is_admin || $cashloan->user_id === $user->id;
+        // Only Pending loans editable (admin any pending, user own pending)
+        $canEdit = $this->isPending($cashloan) && ($user->is_admin || $cashloan->user_id === $user->id);
         abort_unless($canEdit, 403);
 
         return view('cashloans.edit', [
             'loan'     => $cashloan,
-            // Users cannot change status; form should not expose it
-            'statuses' => $user->is_admin ? $this->statuses : [$cashloan->status],
+            'statuses' => $user->is_admin ? $this->statuses : ['Pending'],
             'users'    => $user->is_admin
                 ? User::orderBy('first_name')->get(['id','first_name','last_name','middle_name'])
                 : collect(),
@@ -120,6 +129,7 @@ class CashLoanController extends Controller
         $user = Auth::user();
 
         if ($user->is_admin) {
+            abort_unless($this->isPending($cashloan), 403);
             $data = $request->validate([
                 'user_id'        => ['required','exists:users,id'],
                 'date_requested' => ['required','date'],
@@ -129,8 +139,7 @@ class CashLoanController extends Controller
                 'remarks'        => ['nullable','string'],
             ]);
         } else {
-            // Owner can edit regardless of status, but cannot change user_id or status
-            abort_unless($cashloan->user_id === $user->id, 403);
+            abort_unless($cashloan->user_id === $user->id && $this->isPending($cashloan), 403);
             $data = $request->validate([
                 'date_requested' => ['required','date'],
                 'amount'         => ['required','numeric','min:0.01'],
@@ -138,7 +147,7 @@ class CashLoanController extends Controller
                 'remarks'        => ['nullable','string'],
             ]);
             $data['user_id'] = $cashloan->user_id;
-            $data['status']  = $cashloan->status;
+            $data['status']  = 'Pending';
         }
 
         $cashloan->update($data);
@@ -149,9 +158,7 @@ class CashLoanController extends Controller
     public function destroy(CashLoan $cashloan)
     {
         $user = Auth::user();
-
-        // Admin always; user can delete own loan regardless of status
-        $canDelete = $user->is_admin || $cashloan->user_id === $user->id;
+        $canDelete = $this->isPending($cashloan) && ($user->is_admin || $cashloan->user_id === $user->id);
         abort_unless($canDelete, 403);
 
         $cashloan->delete();
@@ -159,7 +166,6 @@ class CashLoanController extends Controller
         return redirect()->route('cashloans.index')->with('remove_success', 'Cash loan deleted.');
     }
 
-    // Admin status actions
     public function approve(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);

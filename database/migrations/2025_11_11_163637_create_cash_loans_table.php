@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
 
             // Fields (aligned with leaves)
-            $table->date('date_requested');
+            $table->date('date_requested')->default(DB::raw('CURRENT_DATE'));
             $table->decimal('amount', 10, 2);
             $table->string('type', 100);                 // Emergency, Personal, etc.
             $table->string('status', 50)->default('Pending');     // Pending, Approved, Denied

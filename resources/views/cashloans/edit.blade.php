@@ -35,18 +35,21 @@
                             <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
                         </div>
 
-                        <!-- Amount -->
+                        <!-- Amount (CA$) -->
                         <div class="flex-1">
-                            <x-input-label for="amount" :value="__('Amount')" />
-                            <x-text-input
-                                id="amount"
-                                name="amount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                class="mt-1 block w-full"
-                                :value="old('amount', $loan->amount)"
-                                required />
+                            <x-input-label for="amount" :value="__('Amount (CA$)')" />
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
+                                <x-text-input
+                                    id="amount"
+                                    name="amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    class="mt-1 block w-full pl-14"
+                                    :value="old('amount', $loan->amount)"
+                                    required />
+                            </div>
                             <x-input-error class="mt-2" :messages="$errors->get('amount')" />
                         </div>
                     </div>
@@ -73,15 +76,15 @@
                                        rounded-md shadow-sm">
                                 <option value="">Select Type</option>
                                 <option value="Emergency" {{ old('type', $loan->type) == 'Emergency' ? 'selected' : '' }}>Emergency</option>
-                                <option value="Personal" {{ old('type', $loan->type) == 'Personal' ? 'selected' : '' }}>Personal</option>
-                                <option value="Medical" {{ old('type', $loan->type) == 'Medical' ? 'selected' : '' }}>Medical</option>
+                                <option value="Personal"  {{ old('type', $loan->type) == 'Personal'  ? 'selected' : '' }}>Personal</option>
+                                <option value="Medical"   {{ old('type', $loan->type) == 'Medical'   ? 'selected' : '' }}>Medical</option>
                                 <option value="Education" {{ old('type', $loan->type) == 'Education' ? 'selected' : '' }}>Education</option>
-                                <option value="Other" {{ old('type', $loan->type) == 'Other' ? 'selected' : '' }}>Other</option>
+                                <option value="Other"     {{ old('type', $loan->type) == 'Other'     ? 'selected' : '' }}>Other</option>
                             </select>
                             <x-input-error class="mt-2" :messages="$errors->get('type')" />
                         </div>
 
-                        <!-- Status -->
+                        <!-- Status (display only) -->
                         <div class="flex-1">
                             <x-input-label for="status_display" :value="__('Status')" />
                             <x-text-input id="status_display" type="text"
