@@ -66,7 +66,7 @@
                 </tr>
             </thead>
             <tbody class="divide-gray-200 dark:bg-gray-900">
-                @foreach($logs as $log)
+                @forelse($logs as $log)
                     <tr>
                         <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
                             {{ $log->user->first_name ?? 'System' }} {{ $log->user->middle_name ?? '' }} {{ $log->user->last_name ?? '' }}
@@ -81,7 +81,13 @@
                             {{ $log->created_at->diffForHumans() }}
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="4" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">
+                            No audit logs found.
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>

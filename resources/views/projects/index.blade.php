@@ -116,7 +116,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-4 py-2 text-center text-gray-600 dark:text-gray-400">No projects found.</td>
+                                    <td colspan="5" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">No projects found.</td>
                                 </tr>
                             @endforelse
                         </tbody>
