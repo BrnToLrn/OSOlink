@@ -95,9 +95,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('cashloans', CashLoanController::class)->parameters(['cashloans' => 'cashloan']);
     // Cash Loans Admin actions
     Route::middleware('admin')->group(function () {
-        Route::post('cashloans/{cashloan}/activate', [CashLoanController::class, 'activate'])->name('cashloans.activate');
-        Route::post('cashloans/{cashloan}/mark-paid', [CashLoanController::class, 'markPaid'])->name('cashloans.markPaid');
-        Route::post('cashloans/{cashloan}/cancel', [CashLoanController::class, 'cancel'])->name('cashloans.cancel');
+        Route::post('cashloans/{cashloan}/approve', [CashLoanController::class, 'approve'])->name('cashloans.approve');
+        Route::post('cashloans/{cashloan}/reject', [CashLoanController::class, 'reject'])->name('cashloans.reject');
+        Route::post('cashloans/{cashloan}/pending', [CashLoanController::class, 'pending'])->name('cashloans.pending');
     });
 });
 

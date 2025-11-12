@@ -54,13 +54,9 @@
                             @php
                                 $status = $loan->status ?? 'Pending';
                                 $s = strtolower($status);
-                                $statusClass =
-                                    $s === 'approved'     ? 'text-green-600 dark:text-green-400' :
-                                    ($s === 'fully paid'  ? 'text-emerald-600 dark:text-emerald-400' :
-                                    ($s === 'active'      ? 'text-blue-600 dark:text-blue-400' :
-                                    ($s === 'rejected'    ? 'text-red-600 dark:text-red-400' :
-                                    ($s === 'cancelled'   ? 'text-gray-500 dark:text-gray-400' :
-                                                            'text-yellow-600 dark:text-yellow-400'))));
+                                $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
+                                             : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
+                                             : 'text-yellow-600 dark:text-yellow-400');
                             @endphp
                             <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
                         </td>
@@ -76,7 +72,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">No cash loans found.</td>
+                        <td colspan="5" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">No cash loans found.</td>
                     </tr>
                 @endforelse
             </tbody>
