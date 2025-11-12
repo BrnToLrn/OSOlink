@@ -274,7 +274,7 @@
 
                             <!-- Month navigation -->
                             <div class="flex items-center justify-between mb-4">
-                                <button @click="prevMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded">Prev</button>
+                                <button @click="prevMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 dark:text-gray-100 rounded">Prev</button>
                                 <h2 class="text-lg font-semibold dark:text-gray-100">
                                     <span x-text="monthName + ' ' + year"></span>
                                     <!-- Always show user's total -->
@@ -288,7 +288,7 @@
                                         </span>
                                     </template>
                                 </h2>
-                                <button @click="nextMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 rounded">Next</button>
+                                <button @click="nextMonth()" class="px-3 py-1 bg-gray-300 dark:bg-gray-700 dark:text-gray-100  rounded">Next</button>
                             </div>
 
                             <!-- Weekday headers -->
@@ -315,11 +315,11 @@
                                         <!-- Summary of logs -->
                                         <div class="text-xs text-left">
                                             <div x-show="getLogs(date).length > 0" class="flex items-center gap-1">
-                                                <span x-text="getLogs(date).length"></span>
-                                                <span>log(s)</span>
+                                                <span class="dark:text-gray-100" x-text="getLogs(date).length"></span>
+                                                <span class="dark:text-gray-100">log(s)</span>
                                             </div>
-                                            <div x-show="getTotalHours(date) > 0" class="font-semibold">
-                                                <span x-text="getTotalHours(date)"></span>h
+                                            <div class="dark:text-gray-100" x-show="getTotalHours(date) > 0" class="font-semibold">
+                                                <span class="dark:text-gray-100" x-text="getTotalHours(date)"></span>h
                                             </div>
                                         </div>
                                     </div>

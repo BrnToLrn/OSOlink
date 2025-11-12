@@ -48,40 +48,20 @@ Route::middleware('auth')->group(function () {
 
     /**
      * =======================
-     * PROJECTS (auth users)
-     * =======================
-     */
-    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
-    Route::post('/projects/{project}/comments', [ProjectController::class, 'addComment'])->name('projects.comments.store');
-    Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
-
-    /**
-     * =======================
-     * TIMELOGS (nested under projects)
-     * =======================
-     */
-    Route::prefix('projects/{project}')
-        ->scopeBindings()
-        ->group(function () {
-            Route::post('/timelogs', [ProjectController::class, 'addTimeLog'])->name('projects.timelogs.store');
-            Route::put('/timelogs/{timelog}', [ProjectController::class, 'updateTimeLog'])->name('projects.timelogs.update');
-            Route::delete('/timelogs/{timelog}', [ProjectController::class, 'deleteTimeLog'])->name('projects.timelogs.destroy');
-            Route::post('/timelogs/{timelog}/approve', [ProjectController::class, 'approveTimeLog'])->name('projects.timelogs.approve');
-            Route::post('/timelogs/{timelog}/decline', [ProjectController::class, 'declineTimeLog'])->name('projects.timelogs.decline');
-        });
-
-    /**
-     * =======================
      * PROJECTS (admin only)
      * =======================
      */
-    Route::middleware('admin')->group(function () {
+    Route::middleware(['auth', 'admin'])->group(function () {
+        // Create new project
         Route::get('/projects/create', [ProjectController::class, 'create'])->name('projects.create');
-        Route::get('/projects/{project}/edit', [ProjectController::class, 'edit'])->name('projects.edit');
         Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+
+        // Edit/update/delete projects
+        Route::get('/projects/{project}/edit', [ProjectController::class, 'edit'])->name('projects.edit');
         Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
 
+        // Manage project users
         Route::post('/projects/{project}/add-user', [ProjectController::class, 'addUser'])->name('projects.addUser');
         Route::put('/projects/{project}/update-user/{user}', [ProjectController::class, 'updateUserRole'])->name('projects.updateUserRole');
         Route::delete('/projects/{project}/remove-user/{user}', [ProjectController::class, 'removeUser'])->name('projects.removeUser');
@@ -89,6 +69,42 @@ Route::middleware('auth')->group(function () {
         Route::put('/projects/{project}/team', [ProjectController::class, 'updateTeam'])->name('projects.updateTeam');
     });
 
+    /**
+     * =======================
+     * PROJECTS (auth users)
+     * =======================
+     */
+    Route::middleware('auth')->group(function () {
+        // List all projects
+        Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+
+        // Show a single project (numeric only)
+        Route::get('/projects/{project}', [ProjectController::class, 'show'])
+            ->where('project', '[0-9]+')
+            ->name('projects.show');
+
+        // Add comments to a project
+        Route::post('/projects/{project}/comments', [ProjectController::class, 'addComment'])
+            ->where('project', '[0-9]+')
+            ->name('projects.comments.store');
+
+        /**
+         * =======================
+         * TIMELOGS (nested under projects)
+         * =======================
+         */
+        Route::prefix('projects/{project}')
+            ->where(['project' => '[0-9]+'])
+            ->scopeBindings()
+            ->group(function () {
+                Route::post('/timelogs', [ProjectController::class, 'addTimeLog'])->name('projects.timelogs.store');
+                Route::put('/timelogs/{timelog}', [ProjectController::class, 'updateTimeLog'])->name('projects.timelogs.update');
+                Route::delete('/timelogs/{timelog}', [ProjectController::class, 'deleteTimeLog'])->name('projects.timelogs.destroy');
+                Route::post('/timelogs/{timelog}/approve', [ProjectController::class, 'approveTimeLog'])->name('projects.timelogs.approve');
+                Route::post('/timelogs/{timelog}/decline', [ProjectController::class, 'declineTimeLog'])->name('projects.timelogs.decline');
+            });
+    });
+    
     /**
      * =======================
      * PAYSLIP

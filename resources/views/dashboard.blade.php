@@ -17,35 +17,41 @@
                             ->whereDate('end_date', '<', now())->count();
                     @endphp
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-                        <div class="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ $totalProjects }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400">Total Projects</div>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ $totalUsers }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400">Total Users</div>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-rose-100 dark:bg-rose-900 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ $notStarted }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400">Not Started</div>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-blue-100 dark:bg-blue-900 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ $inProgress }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400">In Progress</div>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-red-100 dark:bg-red-900 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-red-600 dark:text-red-400">{{ $onHold }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400">On Hold</div>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-green-800 dark:bg-green-300 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-green-600 dark:text-green-400">{{ $completed }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400">Completed</div>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-pink-100 dark:bg-pink-900 rounded-lg p-6 shadow">
-                            <div class="text-3xl font-bold text-red-600 dark:text-red-400">{{ $overdue }}</div>
-                            <div class="mt-2 text-sm text-gray-800 dark:text-gray-400   ">Overdue</div>
-                        </div>
+                    <div class="flex flex-col items-center justify-center bg-indigo-100 dark:bg-indigo-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-indigo-700 dark:text-indigo-400">{{ $totalProjects }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">Total Projects</div>
                     </div>
+
+                    <div class="flex flex-col items-center justify-center bg-purple-100 dark:bg-purple-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-purple-700 dark:text-purple-400">{{ $totalUsers }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">Total Users</div>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center bg-yellow-100 dark:bg-yellow-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-yellow-700 dark:text-yellow-400">{{ $notStarted }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">Not Started</div>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center bg-blue-100 dark:bg-blue-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-blue-700 dark:text-blue-400">{{ $inProgress }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">In Progress</div>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center bg-red-100 dark:bg-red-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-red-700 dark:text-red-400">{{ $onHold }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">On Hold</div>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center bg-green-100 dark:bg-green-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-green-700 dark:text-green-400">{{ $completed }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">Completed</div>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center bg-pink-100 dark:bg-pink-900 rounded-lg p-6 shadow">
+                        <div class="text-3xl font-bold text-pink-700 dark:text-pink-400">{{ $overdue }}</div>
+                        <div class="mt-2 text-sm text-gray-800 dark:text-gray-200">Overdue</div>
+                    </div>
+                </div>
                 </div>
             @else
                 <!-- Assigned Projects Overview (for regular users) -->
@@ -146,7 +152,7 @@
                                 <span class="ml-2 text-sm text-gray-800 dark:text-gray-400">{{ Str::limit($log->work_output, 40) }}</span>
                             </div>
                             <span class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ $log->user ? $log->user->first_name : 'Unknown' }} · {{ $log->hours }} hrs · {{ $log->date }}
+                                {{ $log->user ? $log->user->first_name : 'Unknown' }} · {{ $log->hours }} hrs · {{ \Carbon\Carbon::parse($log->date)->format('F j, Y') }}
                             </span>
                         </li>
                     @empty

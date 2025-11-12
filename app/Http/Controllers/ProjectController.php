@@ -223,59 +223,45 @@ class ProjectController extends Controller
 
     // --- TIME LOGS ---
 
-    // Note: This function is now private and receives $projectId
-    private function hasOverlappingTimeLog(Request $request, $projectId, $userId, $exceptLogId = null)
+    private function hasOverlappingTimeLog(Request $request, $userId, $exceptLogId = null)
     {
-        $start = Carbon::createFromFormat('Y-m-d H:i', $request->date . ' ' . $request->time_in);
-        $end = Carbon::createFromFormat('Y-m-d H:i', $request->date . ' ' . $request->time_out);
+        $date = Carbon::parse($request->date)->format('Y-m-d');
+        $start = Carbon::parse("$date {$request->time_in}");
+        $end = Carbon::parse("$date {$request->time_out}");
+
         if ($end->lessThanOrEqualTo($start)) {
-            $end->addDay();
+            $end->addDay(); // handle overnight
         }
 
-        $query = TimeLog::where('project_id', $projectId)
-            ->where('user_id', $userId)
-            ->where('date', $request->date)
+        $logs = TimeLog::where('user_id', $userId)
             ->when($exceptLogId, fn($q) => $q->where('id', '!=', $exceptLogId))
-            // This logic is complex and needs to handle time-only checks.
-            // Let's simplify to check for records that start *or* end within the new time.
-            ->where(function ($q) use ($start, $end) {
-                $startTime = $start->format('H:i:s');
-                $endTime = $end->format('H:i:s');
+            ->with('project')
+            ->get();
 
-                if ($end->isSameDay($start)) {
-                    // Not an overnight log
-                    $q->where(function($q2) use ($startTime, $endTime) {
-                        $q2->where('time_in', '>=', $startTime)->where('time_in', '<', $endTime);
-                    })->orWhere(function($q2) use ($startTime, $endTime) {
-                        $q2->where('time_out', '>', $startTime)->where('time_out', '<=', $endTime);
-                    })->orWhere(function($q2) use ($startTime, $endTime) {
-                        $q2->where('time_in', '<', $startTime)->where('time_out', '>', $endTime);
-                    });
-                } else {
-                    // Is an overnight log, logic is more complex
-                    // For now, let's just check for any logs on that day
-                    // A proper check would need to query logs on the *next* day as well
-                    // This is a simplification to prevent the most obvious overlaps.
-                    $q->where('time_in', '>=', '00:00:00') // Just check for *any* log
-                      ->orWhere('time_out', '<=', '23:59:59');
-                }
-            });
+        foreach ($logs as $log) {
+            $logDate = Carbon::parse($log->date)->format('Y-m-d');
+            $logStart = Carbon::parse("$logDate {$log->time_in}");
+            $logEnd = Carbon::parse("$logDate {$log->time_out}");
 
-
-        if ($query->exists()) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'errors' => ['time_in' => ['There is a conflict with an existing time log for this day. Please check your entries.']]
-                ], 422);
+            if ($logEnd->lessThanOrEqualTo($logStart)) {
+                $logEnd->addDay(); // handle overnight
             }
 
-            return back()
-                ->withErrors(['time_in' => 'There is a conflict with an existing time log for this day. Please check your entries.'])
-                ->with('section', 'timelogs');
+            if ($start < $logEnd && $end > $logStart) {
+                $projectName = $log->project?->name ?? 'Unknown Project';
+                $message = "Time Conflict with project '{$projectName}' on {$logDate}";
+
+                if ($request->expectsJson()) {
+                    return response()->json(['errors' => ['time_in' => [$message]]], 422);
+                }
+
+                return back()->withErrors(['time_in' => $message])->with('section', 'timelogs');
+            }
         }
 
-        return false; // No overlap
+        return false; // no overlap
     }
+
 
     // **CHANGED**: Now only takes Request
     public function addTimeLog(Project $project, Request $request)
@@ -286,35 +272,30 @@ class ProjectController extends Controller
             'time_out' => 'required|date_format:H:i',
             'work_output' => 'required|string|max:2000',
         ]);
-        
-        // Check project date boundaries
+
+        // Check project boundaries
         if ($validated['date'] < $project->start_date || $validated['date'] > $project->end_date) {
-             return response()->json([
+            return response()->json([
                 'errors' => ['date' => ['The date must be within the project start and end dates.']]
             ], 422);
         }
 
-        $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, auth()->id());
-        if ($overlapResponse) {
-            return $overlapResponse; // Returns JSON or back()
-        }
+        // Overlap check
+        $overlap = $this->hasOverlappingTimeLog($request, auth()->id());
+        if ($overlap) return $overlap;
 
-        $start = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_in']);
-        $end   = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_out']);
+        $date = Carbon::parse($validated['date'])->format('Y-m-d');
+        $start = Carbon::parse("$date {$validated['time_in']}");
+        $end = Carbon::parse("$date {$validated['time_out']}");
+        if ($end->lessThanOrEqualTo($start)) $end->addDay();
 
-        if ($end->lessThanOrEqualTo($start)) {
-            $end->addDay(); // handles overnight work (e.g., 11pm–2am)
-        }
+        $hours = round($start->diffInMinutes($end) / 60, 2);
 
-        $minutes = $start->diffInMinutes($end);
-        $hours = round($minutes / 60, 2);
-        
-        $role = $project->users()->where('user_id', auth()->id())->first()->pivot->project_role ?? 'Developer';
-
+        $role = $project->users()->where('user_id', auth()->id())->first()?->pivot->project_role ?? 'Developer';
         $status = $role === 'Project Lead' ? 'Approved' : 'Pending';
 
         $timeLog = $project->timeLogs()->create([
-            'user_id' => Auth::id(),
+            'user_id' => auth()->id(),
             'date' => $validated['date'],
             'time_in' => $validated['time_in'],
             'time_out' => $validated['time_out'],
@@ -323,15 +304,11 @@ class ProjectController extends Controller
             'status' => $status,
             'decline_reason' => null,
         ]);
-        
-        // Eager load the user for the response
+
         $timeLog->load('user');
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Time log created successfully',
-                'log' => $timeLog // Return the new log
-            ]);
+            return response()->json(['message' => 'Time log created successfully', 'log' => $timeLog]);
         }
 
         return back()->with('success', 'Time log created successfully');
@@ -340,13 +317,9 @@ class ProjectController extends Controller
     // **CHANGED**: Now takes TimeLog instead of Project
     public function updateTimeLog(Request $request, Project $project, TimeLog $timelog)
     {
-        // Check the timelog belongs to this project
-        if ($timelog->project_id !== $project->id) {
-            abort(404); // or return JSON error
-        }
-
+        abort_if($timelog->project_id !== $project->id, 404);
         $user = auth()->user();
-        if (!$user->is_admin && $timelog->user_id !== $user->id) abort(403);
+        abort_if(!$user->is_admin && $timelog->user_id !== $user->id, 403);
 
         $validated = $request->validate([
             'date' => ['required', 'date', 'after_or_equal:' . $project->start_date, 'before_or_equal:' . $project->end_date],
@@ -355,13 +328,12 @@ class ProjectController extends Controller
             'work_output' => 'required|string|max:2000',
         ]);
 
-        $overlapResponse = $this->hasOverlappingTimeLog($request, $project->id, $timelog->user_id, $timelog->id);
-        if ($overlapResponse) {
-            return $overlapResponse;
-        }
+        $overlap = $this->hasOverlappingTimeLog($request, $timelog->user_id, $timelog->id);
+        if ($overlap) return $overlap;
 
-        $start = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_in']);
-        $end   = Carbon::createFromFormat('Y-m-d H:i', $validated['date'] . ' ' . $validated['time_out']);
+        $date = Carbon::parse($validated['date'])->format('Y-m-d');
+        $start = Carbon::parse("$date {$validated['time_in']}");
+        $end = Carbon::parse("$date {$validated['time_out']}");
         if ($end->lessThanOrEqualTo($start)) $end->addDay();
 
         $hours = round($start->diffInMinutes($end) / 60, 2);
@@ -379,16 +351,13 @@ class ProjectController extends Controller
         $timelog->load('user');
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Time log updated successfully',
-                'log' => $timelog
-            ]);
+            return response()->json(['message' => 'Time log updated successfully', 'log' => $timelog]);
         }
 
-        return redirect()
-            ->route('projects.show', ['project' => $project->id, 'section' => 'timelogs'])
-            ->with('success', 'Time log updated and resubmitted for approval.');
+        return redirect()->route('projects.show', ['project' => $project->id, 'section' => 'timelogs'])
+                        ->with('success', 'Time log updated and resubmitted for approval.');
     }
+
 
     public function deleteTimeLog(Project $project, TimeLog $timelog)
     {
