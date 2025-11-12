@@ -122,6 +122,7 @@ class PayslipController extends Controller
         ]);
 
         $hours = (float) TimeLog::where('user_id', $data['user_id'])
+            ->where('status', 'Approved')
             ->whereBetween('date', [$data['period_from'], $data['period_to']])
             ->sum('hours');
 
