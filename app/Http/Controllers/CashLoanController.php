@@ -10,38 +10,26 @@ use Illuminate\Validation\Rule;
 
 class CashLoanController extends Controller
 {
-    /**
-     * All valid statuses used across the system.
-     */
-    protected array $statuses = [
-        'Pending', 'Approved', 'Rejected', 'Active', 'Fully Paid', 'Cancelled'
-    ];
+    protected array $statuses = ['Pending','Approved','Rejected','Active','Fully Paid','Cancelled'];
 
-    /**
-     * Display personal and global (admin) cash loans.
-     */
     public function index(Request $request)
     {
         $user = Auth::user();
 
-        // Personal (user) loans
         $personalLoans = CashLoan::with('user')
             ->where('user_id', $user->id)
             ->orderByDesc('date_requested')
             ->orderByDesc('id')
             ->get();
 
-        // Global (admin) loans with filters
         $globalLoans = collect();
         if ($user->is_admin) {
             $globalLoans = CashLoan::with('user')
-                ->when($request->filled('status'), fn($q) =>
-                    $q->where('status', $request->string('status')))
-                ->when($request->filled('user_id'), fn($q) =>
-                    $q->where('user_id', (int)$request->input('user_id')))
+                ->when($request->filled('status'), fn($q) => $q->where('status', $request->string('status')))
+                ->when($request->filled('user_id'), fn($q) => $q->where('user_id', (int)$request->input('user_id')))
                 ->when($request->filled('search'), function ($q) use ($request) {
                     $term = '%'.$request->string('search').'%';
-                    $q->where(function($sub) use ($term) {
+                    $q->where(function ($sub) use ($term) {
                         $sub->whereHas('user', function($uq) use ($term) {
                                 $uq->where('first_name','ILIKE',$term)
                                    ->orWhere('last_name','ILIKE',$term)
@@ -64,9 +52,6 @@ class CashLoanController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new loan.
-     */
     public function create()
     {
         $user = Auth::user();
@@ -79,11 +64,6 @@ class CashLoanController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created loan.
-     * Redirects back to index with a "create_success" flash so the message
-     * appears beside the "+ REQUEST CASH LOAN" button (like Leaves).
-     */
     public function store(Request $request)
     {
         $auth = Auth::user();
@@ -101,20 +81,14 @@ class CashLoanController extends Controller
             $data['user_id'] = $auth->id;
             $data['status']  = 'Pending';
         } else {
-            // Default to admin if no user was selected
             $data['user_id'] = $request->filled('user_id') ? (int)$request->input('user_id') : $auth->id;
         }
 
         CashLoan::create($data);
 
-        return redirect()
-            ->route('cashloans.index')
-            ->with('create_success', 'Cash loan created.');
+        return redirect()->route('cashloans.index')->with('create_success', 'Cash loan created.');
     }
 
-    /**
-     * Display a single loan record.
-     */
     public function show(CashLoan $cashloan)
     {
         $user = Auth::user();
@@ -123,89 +97,87 @@ class CashLoanController extends Controller
         return view('cashloans.show', ['loan' => $cashloan]);
     }
 
-    /**
-     * Edit loan (admin only).
-     */
     public function edit(CashLoan $cashloan)
     {
-        abort_unless(Auth::user()?->is_admin, 403);
+        $user = Auth::user();
+
+        // Admin: always; User: owner can edit regardless of status
+        $canEdit = $user->is_admin || $cashloan->user_id === $user->id;
+        abort_unless($canEdit, 403);
 
         return view('cashloans.edit', [
             'loan'     => $cashloan,
-            'statuses' => $this->statuses,
-            'users'    => User::orderBy('first_name')->get(['id','first_name','last_name','middle_name']),
+            // Users cannot change status; form should not expose it
+            'statuses' => $user->is_admin ? $this->statuses : [$cashloan->status],
+            'users'    => $user->is_admin
+                ? User::orderBy('first_name')->get(['id','first_name','last_name','middle_name'])
+                : collect(),
         ]);
     }
 
-    /**
-     * Update loan (admin only).
-     * Redirect to index with "update_success" to mirror Leaves page UX.
-     */
     public function update(Request $request, CashLoan $cashloan)
     {
-        abort_unless(Auth::user()?->is_admin, 403);
+        $user = Auth::user();
 
-        $data = $request->validate([
-            'user_id'        => ['required','exists:users,id'],
-            'date_requested' => ['required','date'],
-            'amount'         => ['required','numeric','min:0.01'],
-            'type'           => ['required','string','max:100'],
-            'status'         => ['required','string','max:50', Rule::in($this->statuses)],
-            'remarks'        => ['nullable','string'],
-        ]);
+        if ($user->is_admin) {
+            $data = $request->validate([
+                'user_id'        => ['required','exists:users,id'],
+                'date_requested' => ['required','date'],
+                'amount'         => ['required','numeric','min:0.01'],
+                'type'           => ['required','string','max:100'],
+                'status'         => ['required','string','max:50', Rule::in($this->statuses)],
+                'remarks'        => ['nullable','string'],
+            ]);
+        } else {
+            // Owner can edit regardless of status, but cannot change user_id or status
+            abort_unless($cashloan->user_id === $user->id, 403);
+            $data = $request->validate([
+                'date_requested' => ['required','date'],
+                'amount'         => ['required','numeric','min:0.01'],
+                'type'           => ['required','string','max:100'],
+                'remarks'        => ['nullable','string'],
+            ]);
+            $data['user_id'] = $cashloan->user_id;
+            $data['status']  = $cashloan->status;
+        }
 
         $cashloan->update($data);
 
-        return redirect()
-            ->route('cashloans.index')
-            ->with('update_success', 'Cash loan updated.');
+        return redirect()->route('cashloans.index')->with('update_success', 'Cash loan updated.');
     }
 
-    /**
-     * Delete a loan (admin only).
-     * Redirect to index with "remove_success" to mirror Leaves page UX.
-     */
     public function destroy(CashLoan $cashloan)
     {
-        abort_unless(Auth::user()?->is_admin, 403);
+        $user = Auth::user();
+
+        // Admin always; user can delete own loan regardless of status
+        $canDelete = $user->is_admin || $cashloan->user_id === $user->id;
+        abort_unless($canDelete, 403);
 
         $cashloan->delete();
 
-        return redirect()
-            ->route('cashloans.index')
-            ->with('remove_success', 'Cash loan deleted.');
+        return redirect()->route('cashloans.index')->with('remove_success', 'Cash loan deleted.');
     }
 
-    /**
-     * Set loan status to Approved.
-     */
+    // Admin status actions
     public function approve(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);
         $cashloan->update(['status' => 'Approved']);
-
         return back()->with('admin_update_success', 'Cash Loan status set to Approved');
     }
 
-    /**
-     * Set loan status to Rejected.
-     */
     public function reject(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);
         $cashloan->update(['status' => 'Rejected']);
-
         return back()->with('admin_update_success', 'Cash Loan status set to Rejected');
     }
 
-    /**
-     * Set loan status to Pending.
-     */
     public function pending(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);
         $cashloan->update(['status' => 'Pending']);
-
         return back()->with('admin_update_success', 'Cash Loan status set to Pending');
     }
 }
