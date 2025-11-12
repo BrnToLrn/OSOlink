@@ -14,7 +14,6 @@ return new class extends Migration {
                 $table->date('period_to');
                 $table->date('pay_date');
                 $table->decimal('total_amount', 15, 2);
-                $table->datetime('created_at')->useCurrent();
                 $table->timestamps();
             });
         }
