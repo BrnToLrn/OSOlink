@@ -84,16 +84,6 @@ class AdminController extends Controller
             'is_admin' => $request->has('is_admin'),
         ]);
 
-        // record hourly rate history (old is null on create)
-        if ($user->hourly_rate !== null) {
-            HourlyRateHistory::create([
-                'user_id' => $user->id,
-                'changed_by' => auth()->id(),
-                'old_hourly_rate' => null,
-                'new_hourly_rate' => $user->hourly_rate,
-            ]);
-        }
-
         $this->logAction('Created User', $user);
 
         return redirect()->route('adminpanel.admin')->with('create_success', 'User created successfully!');
