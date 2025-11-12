@@ -13,13 +13,13 @@
                     </div>
                 </header>
 
-                <form method="POST" action="{{ route('cashloans.update', $cashloan) }}" class="mt-6 space-y-6">
+                <form method="POST" action="{{ route('cashloans.update', $loan) }}" class="mt-6 space-y-6">
                     @csrf
                     @method('PUT')
 
-                    <!-- Preserve fields required by controller but not shown -->
-                    <input type="hidden" name="user_id" value="{{ old('user_id', $cashloan->user_id) }}">
-                    <input type="hidden" name="status" value="{{ old('status', $cashloan->status) }}">
+                    <!-- Hidden fields -->
+                    <input type="hidden" name="user_id" value="{{ old('user_id', $loan->user_id) }}">
+                    <input type="hidden" name="status" value="{{ old('status', $loan->status) }}">
 
                     <div class="flex items-center gap-4 mt-4">
                         <!-- Date Requested -->
@@ -30,21 +30,26 @@
                                 name="date_requested"
                                 type="date"
                                 class="mt-1 block w-full"
-                                :value="old('date_requested', \Carbon\Carbon::parse($cashloan->date_requested)->format('Y-m-d'))" />
+                                :value="old('date_requested', \Carbon\Carbon::parse($loan->date_requested)->format('Y-m-d'))"
+                                required />
                             <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
                         </div>
 
-                        <!-- Amount -->
+                        <!-- Amount (CA$) -->
                         <div class="flex-1">
                             <x-input-label for="amount" :value="__('Amount')" />
-                            <x-text-input
-                                id="amount"
-                                name="amount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                class="mt-1 block w-full"
-                                :value="old('amount', $cashloan->amount)" />
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
+                                <x-text-input
+                                    id="amount"
+                                    name="amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    class="mt-1 block w-full pl-14"
+                                    :value="old('amount', $loan->amount)"
+                                    required />
+                            </div>
                             <x-input-error class="mt-2" :messages="$errors->get('amount')" />
                         </div>
                     </div>
@@ -57,7 +62,7 @@
                             name="remarks"
                             type="text"
                             class="mt-1 block w-full"
-                            :value="old('remarks', $cashloan->remarks)" />
+                            :value="old('remarks', $loan->remarks)" />
                         <x-input-error class="mt-2" :messages="$errors->get('remarks')" />
                     </div>
 
@@ -70,21 +75,21 @@
                                        focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600
                                        rounded-md shadow-sm">
                                 <option value="">Select Type</option>
-                                <option value="Emergency" {{ old('type', $cashloan->type) == 'Emergency' ? 'selected' : '' }}>Emergency</option>
-                                <option value="Personal" {{ old('type', $cashloan->type) == 'Personal' ? 'selected' : '' }}>Personal</option>
-                                <option value="Medical" {{ old('type', $cashloan->type) == 'Medical' ? 'selected' : '' }}>Medical</option>
-                                <option value="Education" {{ old('type', $cashloan->type) == 'Education' ? 'selected' : '' }}>Education</option>
-                                <option value="Other" {{ old('type', $cashloan->type) == 'Other' ? 'selected' : '' }}>Other</option>
+                                <option value="Emergency" {{ old('type', $loan->type) == 'Emergency' ? 'selected' : '' }}>Emergency</option>
+                                <option value="Personal"  {{ old('type', $loan->type) == 'Personal'  ? 'selected' : '' }}>Personal</option>
+                                <option value="Medical"   {{ old('type', $loan->type) == 'Medical'   ? 'selected' : '' }}>Medical</option>
+                                <option value="Education" {{ old('type', $loan->type) == 'Education' ? 'selected' : '' }}>Education</option>
+                                <option value="Other"     {{ old('type', $loan->type) == 'Other'     ? 'selected' : '' }}>Other</option>
                             </select>
                             <x-input-error class="mt-2" :messages="$errors->get('type')" />
                         </div>
 
-                        <!-- Status (display only, matches leaves/edit style) -->
+                        <!-- Status (display only) -->
                         <div class="flex-1">
                             <x-input-label for="status_display" :value="__('Status')" />
                             <x-text-input id="status_display" type="text"
                                 class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-70"
-                                :value="old('status', $cashloan->status ?? 'Pending')" disabled />
+                                :value="old('status', $loan->status ?? 'Pending')" disabled />
                         </div>
                     </div>
 

@@ -5,15 +5,15 @@
                 Manage Global Cash Loans
             </h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Approve, view, and search global cash loans.
+                Approve, reject, or mark pending global cash loans.
             </p>
         </div>
     </header>
 
-    <!-- Filter / Sorter (mirrors leaves partial) -->
+    <!-- Filter / Sorter -->
     <div class="mt-6 mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         <form method="GET" action="{{ request()->url() }}" class="flex flex-wrap gap-3 items-center">
-            <!-- Search (by user name or remarks) -->
+            <!-- Search -->
             <x-text-input
                 type="text"
                 name="search"
@@ -28,9 +28,9 @@
                        bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 
                        focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                 <option value="">All Status</option>
-                @foreach (['Pending','Approved','Rejected','Active','Fully Paid','Cancelled'] as $st)
-                    <option value="{{ $st }}" {{ request('status')===$st ? 'selected' : '' }}>{{ $st }}</option>
-                @endforeach
+                <option value="pending" {{ request('status')=='pending' ? 'selected' : '' }}>Pending</option>
+                <option value="approved" {{ request('status')=='approved' ? 'selected' : '' }}>Approved</option>
+                <option value="rejected" {{ request('status')=='rejected' ? 'selected' : '' }}>Rejected</option>
             </select>
 
             <!-- Sort Field -->
@@ -84,29 +84,23 @@
                             {{ $loan->user->first_name }} {{ $loan->user->middle_name }} {{ $loan->user->last_name }}
                         </td>
 
-                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            {{ $loan->type }}
-                        </td>
+                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ $loan->type }}</td>
 
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             {{ $loan->date_requested ? \Carbon\Carbon::parse($loan->date_requested)->format('F j, Y') : 'N/A' }}
                         </td>
 
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            {{ isset($loan->amount) ? number_format((float)$loan->amount, 2) : '0.00' }}
+                            CA$ {{ number_format((float)($loan->amount ?? 0), 2) }}
                         </td>
 
                         <td class="px-4 py-2 text-center">
                             @php
                                 $status = $loan->status ?? 'Pending';
                                 $s = strtolower($status);
-                                $statusClass =
-                                    $s === 'approved'     ? 'text-green-600 dark:text-green-400' :
-                                    ($s === 'fully paid'  ? 'text-emerald-600 dark:text-emerald-400' :
-                                    ($s === 'active'      ? 'text-blue-600 dark:text-blue-400' :
-                                    ($s === 'rejected'    ? 'text-red-600 dark:text-red-400' :
-                                    ($s === 'cancelled'   ? 'text-gray-500 dark:text-gray-400' :
-                                                            'text-yellow-600 dark:text-yellow-400'))));
+                                $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
+                                             : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
+                                             : 'text-yellow-600 dark:text-yellow-400');
                             @endphp
                             <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
                         </td>
@@ -115,26 +109,28 @@
                             <div class="inline-flex items-center justify-center gap-3">
                                 <a href="{{ route('cashloans.show', $loan) }}" class="text-blue-600 dark:text-blue-400 hover:underline">View</a>
 
-                                <form action="{{ route('cashloans.activate', $loan) }}" method="POST" class="m-0">
+                                <form action="{{ route('cashloans.approve', $loan) }}" method="POST" class="m-0">
                                     @csrf
-                                    <button type="submit" class="text-indigo-600 dark:text-indigo-400 hover:underline">Activate</button>
+                                    <button type="submit" class="text-green-600 dark:text-green-400 hover:underline">Approve</button>
                                 </form>
 
-                                <form action="{{ route('cashloans.markPaid', $loan) }}" method="POST" class="m-0">
+                                <form action="{{ route('cashloans.reject', $loan) }}" method="POST" class="m-0">
                                     @csrf
-                                    <button type="submit" class="text-green-600 dark:text-green-400 hover:underline">Mark Paid</button>
+                                    <button type="submit" class="text-red-600 hover:underline">Reject</button>
                                 </form>
 
-                                <form action="{{ route('cashloans.cancel', $loan) }}" method="POST" class="m-0">
+                                <form action="{{ route('cashloans.pending', $loan) }}" method="POST" class="m-0">
                                     @csrf
-                                    <button type="submit" class="text-red-600 hover:underline">Cancel</button>
+                                    <button type="submit" class="text-yellow-600 dark:text-yellow-400 hover:underline">Pending</button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-2 text-center text-gray-500">No cash loans found.</td>
+                        <td colspan="6" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">
+                            No cash loans found.
+                        </td>
                     </tr>
                 @endforelse
             </tbody>

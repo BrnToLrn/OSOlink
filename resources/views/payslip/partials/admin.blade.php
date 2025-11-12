@@ -37,14 +37,14 @@
             <!-- Period From -->
             <div class="flex-1">
                 <x-input-label for="period_from" :value="__('Period From')" />
-                <x-text-input id="period_from" name="period_from" type="date" class="mt-1 block w-full" value="{{ old('period_from', now()->toDateString()) }}" />
+                <x-text-input id="period_from" name="period_from" type="date" class="mt-1 block w-full" value="{{ old('period_from', now()->subDays(15)->toDateString()) }}" />
                 <x-input-error class="mt-2" :messages="$errors->get('period_from')" />
             </div>
 
             <!-- Period To -->
             <div class="flex-1">
                 <x-input-label for="period_to" :value="__('Period To')" />
-                <x-text-input id="period_to" name="period_to" type="date" class="mt-1 block w-full" value="{{ old('period_to', now()->addDays(15)->toDateString()) }}" />
+                <x-text-input id="period_to" name="period_to" type="date" class="mt-1 block w-full" value="{{ old('period_to', now()->toDateString()) }}" />
                 <x-input-error class="mt-2" :messages="$errors->get('period_to')" />
             </div>
         </div>
