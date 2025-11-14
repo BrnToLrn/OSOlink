@@ -12,20 +12,36 @@
                         </p>
                     </div>
                 </header>
+
                 <form method="POST" action="{{ route('leaves.store') }}" class="mt-6 space-y-6">
                     @csrf
+
                     <div class="flex items-center gap-4 mt-4">
-                        <!-- Start Date -->
+                        <!-- Start Date (autofilled to today, read-only and grayed out) -->
                         <div class="flex-1">
                             <x-input-label for="start_date" :value="__('Start Date')" />
-                            <x-text-input id="start_date" name="start_date" type="date" class="mt-1 block w-full" :value="old('start_date')" />
+                            <x-text-input
+                                id="start_date"
+                                name="start_date"
+                                type="date"
+                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
+                                :value="old('start_date', now()->toDateString())"
+                                readonly
+                                required />
                             <x-input-error class="mt-2" :messages="$errors->get('start_date')" />
                         </div>
 
                         <!-- End Date -->
                         <div class="flex-1">
                             <x-input-label for="end_date" :value="__('End Date')" />
-                            <x-text-input id="end_date" name="end_date" type="date" class="mt-1 block w-full" :value="old('end_date')" />
+                            <x-text-input
+                                id="end_date"
+                                name="end_date"
+                                type="date"
+                                class="mt-1 block w-full"
+                                :min="old('start_date', now()->toDateString())"
+                                :value="old('end_date')"
+                                required />
                             <x-input-error class="mt-2" :messages="$errors->get('end_date')" />
                         </div>
                     </div>
@@ -33,7 +49,7 @@
                     <!-- Reason -->
                     <div>
                         <x-input-label for="reason" :value="__('Reason of Leave')" />
-                        <x-text-input id="reason" name="reason" type="text" class="mt-1 block w-full" required />
+                        <x-text-input id="reason" name="reason" type="text" class="mt-1 block w-full" :value="old('reason')" />
                         <x-input-error class="mt-2" :messages="$errors->get('reason')" />
                     </div>
 
@@ -41,7 +57,10 @@
                         <!-- Type -->
                         <div class="flex-1">
                             <x-input-label for="type" :value="__('Type of Leave')" />
-                            <select id="type" name="type" required class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm">
+                            <select id="type" name="type" required
+                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300
+                                       focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600
+                                       rounded-md shadow-sm">
                                 <option value="">Select Type</option>
                                 <option value="Sick Leave" {{ old('type') == 'Sick Leave' ? 'selected' : '' }}>Sick Leave</option>
                                 <option value="Vacation Leave" {{ old('type') == 'Vacation Leave' ? 'selected' : '' }}>Vacation Leave</option>
@@ -55,7 +74,9 @@
                         <!-- Status -->
                         <div class="flex-1">
                             <x-input-label for="status" :value="__('Status')" />
-                            <x-text-input id="status" name="status" type="text" class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-70" :value="__('Pending')" disabled />
+                            <x-text-input id="status" name="status" type="text"
+                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-70"
+                                :value="__('Pending')" disabled />
                             <input type="hidden" name="status" value="Pending" />
                         </div>
                     </div>
@@ -63,11 +84,29 @@
                     <div class="flex items-center gap-4">
                         <x-primary-button>Create</x-primary-button>
                         @if (session('create_success'))
-                        <p class="text-sm text-green-600 dark:text-green-400">{{ session('create_success') }}</p>
+                            <p class="text-sm text-green-600 dark:text-green-400">{{ session('create_success') }}</p>
                         @endif
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
+    <!-- Keep end_date >= start_date -->
+    <script>
+        (function () {
+            const start = document.getElementById('start_date');
+            const end = document.getElementById('end_date');
+            if (!start || !end) return;
+
+            function syncMin() {
+                if (start.value) {
+                    end.min = start.value;
+                    if (end.value && end.value < start.value) end.value = start.value;
+                }
+            }
+            start.addEventListener('change', syncMin);
+            syncMin();
+        })();
+    </script>
 </x-app-layout>
