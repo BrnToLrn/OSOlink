@@ -9,13 +9,28 @@
             </p>
         </div>
         <div class="flex items-center gap-4">
-            @if (session('update_success'))
-               <p class="text-sm text-green-600 dark:text-green-400">{{ session('update_success') }}</p>
-            @elseif (session('create_success'))
-               <p class="text-sm text-green-600 dark:text-green-400">{{ session('create_success') }}</p>
-            @elseif (session('remove_success'))
-               <p class="text-sm text-green-600 dark:text-green-400">{{ session('remove_success') }}</p>
+            @php
+                $flashMessage =
+                    session('update_success') ??
+                    session('create_success') ??
+                    session('remove_success');
+
+                $flashClass = '';
+                if ($flashMessage) {
+                    if (session('remove_success')) {
+                        // Deletion -> red
+                        $flashClass = 'text-red-600 dark:text-red-400';
+                    } else {
+                        // Create / update -> green
+                        $flashClass = 'text-green-600 dark:text-green-400';
+                    }
+                }
+            @endphp
+
+            @if($flashMessage)
+               <p class="text-sm font-medium {{ $flashClass }}">{{ $flashMessage }}</p>
             @endif
+
             <a href="{{ route('cashloans.create') }}"
                class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
                 + Request Cash Loan
@@ -47,30 +62,24 @@
                     @endphp
                     <tr>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ $loan->type }}</td>
-
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             {{ $loan->date_requested ? \Carbon\Carbon::parse($loan->date_requested)->format('F j, Y') : 'N/A' }}
                         </td>
-
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             CA$ {{ number_format((float)$loan->amount, 2) }}
                         </td>
-
                         <td class="px-4 py-2 text-center font-medium {{ $statusClass }}">
                             {{ ucfirst($status) }}
                         </td>
-
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             <div class="inline-flex items-center gap-3">
                                 @if($isPending)
                                     <a href="{{ route('cashloans.edit', $loan) }}"
                                        class="text-green-600 dark:text-green-400 hover:underline">Edit</a>
-
                                     <form action="{{ route('cashloans.destroy', $loan) }}" method="POST" class="inline">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit"
-                                                class="text-red-600 hover:underline">
+                                        <button type="submit" class="text-red-600 hover:underline">
                                             Delete
                                         </button>
                                     </form>

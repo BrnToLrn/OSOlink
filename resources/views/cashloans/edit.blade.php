@@ -22,22 +22,23 @@
                     <input type="hidden" name="status" value="{{ old('status', $loan->status) }}">
 
                     <div class="flex items-center gap-4 mt-4">
-                        <!-- Date Requested -->
+                        <!-- Date Requested (read-only & grayed out) -->
                         <div class="flex-1">
                             <x-input-label for="date_requested" :value="__('Date Requested')" />
                             <x-text-input
                                 id="date_requested"
                                 name="date_requested"
                                 type="date"
-                                class="mt-1 block w-full"
+                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
                                 :value="old('date_requested', \Carbon\Carbon::parse($loan->date_requested)->format('Y-m-d'))"
+                                readonly
                                 required />
                             <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
                         </div>
 
                         <!-- Amount (CA$) -->
                         <div class="flex-1">
-                            <x-input-label for="amount" :value="__('Amount')" />
+                            <x-input-label for="amount" :value="__('Amount (CA$)')" />
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
                                 <x-text-input
