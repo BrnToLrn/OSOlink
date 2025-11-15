@@ -13,24 +13,21 @@ class LeaveController extends Controller
         $this->middleware('auth');
     }
 
-    // List leaves (users see their own; admins also see global list)
     public function index(Request $request)
     {
         $user = Auth::user();
 
-        $personalLeaves = Leave::with('user')
-            ->where('user_id', $user->id)
+        $personalLeaves = Leave::where('user_id', $user->id)
             ->orderByDesc('start_date')
             ->orderByDesc('id')
-            ->paginate(10, ['*'], 'personal_page');
+            ->get();
 
         $globalLeaves = null;
         if ($user->is_admin ?? false) {
             $globalLeaves = Leave::with('user')
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
-                ->paginate(15, ['*'], 'global_page')
-                ->appends($request->except('personal_page'));
+                ->get();
         }
 
         return view('leaves.index', compact('personalLeaves', 'globalLeaves'));
@@ -43,7 +40,6 @@ class LeaveController extends Controller
 
     public function store(Request $request)
     {
-        // Enforce today's date for start_date before validation
         $request->merge([
             'start_date' => now()->toDateString(),
             'status'     => 'Pending',
@@ -58,60 +54,55 @@ class LeaveController extends Controller
         ]);
 
         $data['user_id'] = Auth::id();
-
         Leave::create($data);
 
-        return redirect()->route('leaves.index')->with('create_success', 'Leave request created.');
+        return redirect()->route('leaves.index')
+            ->with('create_success', 'Leave request created.');
     }
 
     public function show(Leave $leave)
     {
-        $this->authorizeAccess($leave);
+        $this->authorizeView($leave);
         return view('leaves.show', compact('leave'));
     }
 
     public function edit(Leave $leave)
     {
-        $this->authorizeAccess($leave);
+        $this->authorizeMutable($leave);
         return view('leaves.edit', compact('leave'));
     }
 
     public function update(Request $request, Leave $leave)
     {
-        $this->authorizeAccess($leave);
+        $this->authorizeMutable($leave);
 
-        // Users cannot change status via form; admins can
-        $rules = [
+        $data = $request->validate([
             'start_date' => ['required','date'],
             'end_date'   => ['required','date','after_or_equal:start_date'],
             'type'       => ['required','string','max:100'],
             'reason'     => ['nullable','string'],
-        ];
-        if (Auth::user()->is_admin ?? false) {
-            $rules['status'] = ['required','string','in:Pending,Approved,Rejected'];
-        }
+            'status'     => ['nullable','string','in:Pending,Approved,Rejected'],
+        ]);
 
-        $data = $request->validate($rules);
-
-        if (!($this->isAdmin())) {
-            // Force status back to Pending for regular users
+        if (!$this->isAdmin()) {
             $data['status'] = 'Pending';
         }
 
         $leave->update($data);
 
-        return redirect()->route('leaves.index')->with('update_success', 'Leave updated.');
+        return redirect()->route('leaves.index')
+            ->with('update_success', 'Leave updated.');
     }
 
     public function destroy(Leave $leave)
     {
-        $this->authorizeAccess($leave);
+        $this->authorizeMutable($leave);
         $leave->delete();
 
-        return redirect()->route('leaves.index')->with('remove_success', 'Leave deleted.');
+        return redirect()->route('leaves.index')
+            ->with('remove_success', 'Leave deleted.');
     }
 
-    // Admin actions
     public function approve(Leave $leave)
     {
         $this->authorizeAdmin();
@@ -133,24 +124,34 @@ class LeaveController extends Controller
         return back()->with('admin_update_success', 'Leave status set to Pending.');
     }
 
-    // Helpers
-    private function authorizeAccess(Leave $leave): void
+    private function isAdmin(): bool
+    {
+        return (bool)(Auth::user()->is_admin ?? false);
+    }
+
+    private function isOwnerOrAdmin(Leave $leave): bool
     {
         $user = Auth::user();
-        if (!($user->is_admin ?? false) && $leave->user_id !== $user->id) {
-            abort(403);
-        }
+        return $leave->user_id === $user->id || ($user->is_admin ?? false);
+    }
+
+    private function isPending(Leave $leave): bool
+    {
+        return strcasecmp((string)($leave->status ?? ''), 'Pending') === 0;
+    }
+
+    private function authorizeView(Leave $leave): void
+    {
+        abort_unless($this->isOwnerOrAdmin($leave), 403);
+    }
+
+    private function authorizeMutable(Leave $leave): void
+    {
+        abort_unless($this->isOwnerOrAdmin($leave) && $this->isPending($leave), 403);
     }
 
     private function authorizeAdmin(): void
     {
-        if (!$this->isAdmin()) {
-            abort(403);
-        }
-    }
-
-    private function isAdmin(): bool
-    {
-        return (bool)(Auth::user()->is_admin ?? false);
+        abort_unless($this->isAdmin(), 403);
     }
 }

@@ -14,7 +14,7 @@
             @elseif (session('create_success'))
                <p class="text-sm text-green-600 dark:text-green-400">{{ session('create_success') }}</p>
             @elseif (session('remove_success'))
-               <p class="text-sm text-green-600 dark:text-green-400">{{ session('remove_success') }}</p>
+               <p class="text-sm text-red-600 dark:text-red-400">{{ session('remove_success') }}</p>
             @endif
             <a href="{{ route('leaves.create') }}"
                 class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 border border-transparent 
@@ -37,8 +37,16 @@
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-gray-200 dark:bg-gray-900 text-sm">
+            <tbody class="divide-gray-2 00 dark:bg-gray-900 text-sm">
                 @forelse ($leaves as $leave)
+                    @php
+                        $status = $leave->status ?? 'Pending';
+                        $s = strtolower($status);
+                        $isPending = $s === 'pending';
+                        $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
+                                     : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
+                                     : 'text-yellow-600 dark:text-yellow-400');
+                    @endphp
                     <tr>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ $leave->type }}</td>
 
@@ -50,24 +58,24 @@
                             {{ $leave->end_date ? \Carbon\Carbon::parse($leave->end_date)->format('F j, Y') : 'N/A' }}
                         </td>
 
-                        <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            @php
-                                $status = $leave->status ?? 'Pending';
-                                $s = strtolower($status);
-                                $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
-                                             : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
-                                             : 'text-yellow-600 dark:text-yellow-400');
-                            @endphp
-                            <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
+                        <td class="px-4 py-2 text-center font-medium {{ $statusClass }}">
+                            {{ ucfirst($status) }}
                         </td>
                         
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
-                            <a href="{{ route('leaves.edit', $leave) }}" class="text-green-600 dark:text-green-400 hover:underline">Edit</a>
-                            <form action="{{ route('leaves.destroy', $leave) }}" method="POST" style="display:inline;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-red-600 hover:underline ml-2">Delete</button>
-                            </form>
+                            <div class="inline-flex items-center gap-3">
+                                @if($isPending)
+                                    <a href="{{ route('leaves.edit', $leave) }}" class="text-green-600 dark:text-green-400 hover:underline">Edit</a>
+                                    <form action="{{ route('leaves.destroy', $leave) }}" method="POST" class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 dark:text-red-400 hover:underline">Delete</button>
+                                    </form>
+                                @else
+                                    <span class="text-green-600 dark:text-green-400 opacity-40 cursor-not-allowed select-none">Edit</span>
+                                    <span class="text-red-600 dark:text-red-400 opacity-40 cursor-not-allowed select-none">Delete</span>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty
