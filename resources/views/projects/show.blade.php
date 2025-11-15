@@ -10,10 +10,15 @@
                     </h2>
 
                     @if(auth()->user()->is_admin)
-                        <x-secondary-button :href="route('projects.edit', $project->id)" as="a">
+                        <a href="{{ route('projects.edit', $project->id) }}"
+                        class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md 
+                                font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm 
+                                hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 
+                                focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
                             Edit Project
-                        </x-secondary-button>
+                        </a>
                     @endif
+ 
                 </div>
                 
                 <div class="flex items-start justify-between mb-4">
