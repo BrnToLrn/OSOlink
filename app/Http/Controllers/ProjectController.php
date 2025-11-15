@@ -17,11 +17,14 @@ class ProjectController extends Controller
     // List projects
     public function index(Request $request)
     {
+        $user = auth()->user();
         $query = Project::query();
 
+        // --- 1. GET PROJECTS FOR THE LIST ---
+
         // Only show assigned projects for non-admins
-        if (!auth()->user()->is_admin) {
-            $query->whereHas('users', fn($q) => $q->where('users.id', auth()->id()));
+        if (!$user->is_admin) {
+            $query->whereHas('users', fn($q) => $q->where('users.id', $user->id));
         }
 
         // Search by name
@@ -39,9 +42,60 @@ class ProjectController extends Controller
         $sortDir = $request->get('sort_dir', 'asc');
         $query->orderBy($sortBy, $sortDir);
 
-        $projects = $query->with('users')->get();
+        // Add 'users_count' for the table
+        $projects = $query->withCount('users')->get();
 
-        return view('projects.index', compact('projects'));
+
+        // --- 2. GET DATA FOR THE GLOBAL CALENDAR ---
+
+        // Get all projects the user is *assigned to* for the filter dropdown
+        $allProjectsForFilter = $user->is_admin 
+            ? Project::orderBy('name')->get() 
+            : $user->projects()->orderBy('name')->get();
+
+        // Get all time logs, respecting the project filter
+        $timeLogQuery = TimeLog::with('project', 'user') // Eager load for the modal
+            ->whereIn('project_id', $allProjectsForFilter->pluck('id')); // Only logs from user's projects
+
+        // !! THIS IS THE CHANGE !!
+        // We REMOVE the filter from the CONTROLLER
+        // The controller ALWAYS sends ALL logs. Alpine.js will do the filtering.
+        
+        // if ($request->filled('project_id')) {
+        //     $timeLogQuery->where('project_id', $request->project_id);
+        // }
+
+        // If not admin, only show their own logs
+        if (!$user->is_admin) {
+            $timeLogQuery->where('user_id', $user->id);
+        }
+
+        $allTimeLogs = $timeLogQuery->get();
+
+        // Group by date, just like in the show() method
+        $calendarLogs = $allTimeLogs->groupBy(function ($log) {
+            return $log->date->format('Y-m-d');
+        })->map(function ($logsOnDate) {
+            // Map each log to the format Alpine needs
+            return $logsOnDate->map(function ($log) {
+                return [
+                    'id' => $log->id,
+                    'project_id' => $log->project_id,
+                    'project_name' => $log->project ? $log->project->name : 'Unknown Project',
+                    'status' => $log->status,
+                    'time_in' => $log->time_in,
+                    'time_out' => $log->time_out,
+                    'work_output' => $log->work_output,
+                    'hours' => $log->hours,
+                    'decline_reason' => $log->decline_reason,
+                    'user_id' => $log->user_id,
+                    'user_name' => $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'Unknown User',
+                ];
+            });
+        })->toArray(); // Convert to array for JSON
+
+
+        return view('projects.index', compact('projects', 'allProjectsForFilter', 'calendarLogs'));
     }
 
     // Show create form (admin only)
@@ -91,6 +145,34 @@ class ProjectController extends Controller
         return redirect()->route('projects.show', $project)->with('success', 'Project created successfully!');
     }
 
+    // =================================================================
+    //  NEW HELPER FUNCTION TO FORMAT TIME LOGS CONSISTENTLY
+    // =================================================================
+    /**
+     * Formats a TimeLog model into a consistent array for JSON/Alpine.
+     */
+    private function formatTimeLogForJson(TimeLog $log)
+    {
+        // Eager load the user relationship if it's not already loaded
+        $log->loadMissing('user'); 
+
+        return [
+            'id' => $log->id,
+            'date' => $log->date,
+            'status' => $log->status,
+            'time_in' => $log->time_in,
+            'time_out' => $log->time_out,
+            'work_output' => $log->work_output,
+            'hours' => $log->hours,
+            'decline_reason' => $log->decline_reason,
+            'user_id' => $log->user_id,
+            'user' => $log->user, // Pass the whole user object
+            'user_name' => $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'Unknown User',
+            'can_manage' => auth()->user()->is_admin || auth()->id() === $log->user_id
+        ];
+    }
+
+
     // Show project
     public function show(Project $project)
     {
@@ -133,20 +215,9 @@ class ProjectController extends Controller
             })->map(function ($logsOnDate) {
                 // Map each log in the group to the format Alpine needs
                 return $logsOnDate->map(function ($log) {
-                    return [
-                        'id' => $log->id,
-                        'status' => $log->status,
-                        'time_in' => $log->time_in,
-                        'time_out' => $log->time_out,
-                        'work_output' => $log->work_output,
-                        'hours' => $log->hours,
-                        'decline_reason' => $log->decline_reason,
-                        'user_id' => $log->user_id,
-                        'user' => $log->user, // Pass the whole user object
-                        'user_name' => $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'Unknown User',
-                        // We can add this for the edit/delete/approve policy
-                        'can_manage' => auth()->user()->is_admin || auth()->id() === $log->user_id
-                    ];
+                    // ===== THIS IS THE CHANGE =====
+                    return $this->formatTimeLogForJson($log); // Use the helper
+                    // ===== END OF CHANGE =====
                 });
             })->toArray(); // Convert the final structure to an array for JSON
 
@@ -305,10 +376,15 @@ class ProjectController extends Controller
             'decline_reason' => null,
         ]);
 
-        $timeLog->load('user');
+        // $timeLog->load('user'); // No longer needed, helper does it
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Time log created successfully', 'log' => $timeLog]);
+            // ===== THIS IS THE CHANGE =====
+            return response()->json([
+                'message' => 'Time log created successfully',
+                'log' => $this->formatTimeLogForJson($timeLog) // Use the helper
+            ]);
+            // ===== END OF CHANGE =====
         }
 
         return back()->with('success', 'Time log created successfully');
@@ -348,10 +424,15 @@ class ProjectController extends Controller
             'decline_reason' => null,
         ]);
 
-        $timelog->load('user');
+        // $timelog->load('user'); // No longer needed, helper does it
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Time log updated successfully', 'log' => $timelog]);
+            // ===== THIS IS THE CHANGE =====
+            return response()->json([
+                'message' => 'Time log updated successfully',
+                'log' => $this->formatTimeLogForJson($timelog) // Use the helper
+            ]);
+            // ===== END OF CHANGE =====
         }
 
         return redirect()->route('projects.show', ['project' => $project->id, 'section' => 'timelogs'])
@@ -401,6 +482,10 @@ class ProjectController extends Controller
             'decline_reason' => null
         ]);
 
+        if (request()->expectsJson()) {
+            return response()->json(['log' => $this->formatTimeLogForJson($timelog)]);
+        }
+
         return back()->with('success', 'Time log approved.');
     }
 
@@ -424,6 +509,10 @@ class ProjectController extends Controller
             'status' => 'Declined',
             'decline_reason' => $validated['decline_reason']
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json(['log' => $this->formatTimeLogForJson($timelog)]);
+        }
 
         return back()->with('success', 'Time log declined.');
     }

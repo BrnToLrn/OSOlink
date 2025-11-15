@@ -423,20 +423,35 @@
                                                     
                                                     <!-- Approval/Decline buttons for Lead -->
                                                     <div x-show="isProjectLead && log.status === 'Pending'" class="flex gap-2 mt-3">
-                                                        <!-- Approve -->
-                                                        <form :action="`/projects/${projectId}/timelogs/${log.id}/approve`" method="POST">
-                                                            @csrf
-                                                            <x-primary-button class="text-xs !py-1 !px-2 bg-green-600">Approve</x-primary-button>
-                                                        </form>
+                                                        <x-primary-button 
+                                                            @click="approveLog(log)" 
+                                                            type="button" 
+                                                            class="text-xs !py-1 !px-2 bg-green-600">
+                                                            Approve
+                                                        </x-primary-button>
 
-                                                        <!-- Decline -->
-                                                        <div x-data="{ showDecline: false }">
-                                                            <x-primary-button @click="showDecline = !showDecline" class="!text-xs !py-1 !px-2 !bg-red-600">Decline</x-primary-button>
-                                                            <form x-show="showDecline" :action="`/projects/${projectId}/timelogs/${log.id}/decline`" method="POST" class="mt-2 flex gap-1">
-                                                                @csrf
-                                                                <x-text-input type="text" name="decline_reason" placeholder="Reason..." required class="!text-xs !py-1 w-full"/>
-                                                                <x-secondary-button type="submit" class="!text-xs !py-1 !px-2">Go</x-secondary-button>
-                                                            </form>
+                                                        <div x-data="{ showDecline: false, declineReason: '' }">
+                                                            <x-primary-button 
+                                                                @click="showDecline = !showDecline" 
+                                                                type="button" 
+                                                                class="!text-xs !py-1 !px-2 !bg-red-600">
+                                                                Decline
+                                                            </x-primary-button>
+                                                            
+                                                            <div x-show="showDecline" class="mt-2 flex gap-1">
+                                                                <x-text-input 
+                                                                    type="text" 
+                                                                    x-model="declineReason" 
+                                                                    placeholder="Reason..." 
+                                                                    required 
+                                                                    class="!text-xs !py-1 w-full"/>
+                                                                <x-secondary-button 
+                                                                    type="button" 
+                                                                    @click="declineLog(log, declineReason)" 
+                                                                    class="!text-xs !py-1 !px-2">
+                                                                    Go
+                                                                </x-secondary-button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     
@@ -493,308 +508,401 @@
                         </div> <!-- End of timeLogCalendar x-data -->
 
                         <script>
-                        function timeLogCalendar(data) {
-                            return {
-                                weekdays: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
-                                timeLogs: data.timeLogs || {},
-                                currentUserId: data.currentUserId,
-                                isProjectLead: data.isProjectLead,
-                                projectId: data.projectId,
-                                selectedDateFormatted: '',
-                                logFilter: 'all',
-                                projectStart: data.projectStart,
-                                projectEnd: data.projectEnd,
-                                
-                                isDateAllowed(dateStr) {
-                                    const today = new Date();
-                                    today.setHours(0, 0, 0, 0); // normalize to start of today
-
-                                    const date = new Date(dateStr);
-                                    date.setHours(0, 0, 0, 0); // normalize to start of that day
-
-                                    const start = new Date(this.projectStart);
-                                    start.setHours(0, 0, 0, 0);
-                                    const end = new Date(this.projectEnd);
-                                    end.setHours(0, 0, 0, 0);
-
-                                    return date >= start && date <= end && date <= today;
-                                },
-
-                                showModal: false,
-                                selectedDate: null,      // 'YYYY-MM-DD'
-                                rawSelectedLogs: [],
-
-                                get selectedLogs() {
-                                    if (this.logFilter === 'mine') {
-                                        return this.rawSelectedLogs.filter(log => log.user_id === this.currentUserId);
-                                    }
-                                    return this.rawSelectedLogs;
-                                },
-                                    // Array of logs for the selected date
-                                
-                                // Form models
-                                formTitle: 'Add Time Log',
-                                formButtonText: 'Save',
-                                formAction: '',
-                                formMethod: 'POST',
-                                formTimeIn: '',
-                                formTimeOut: '',
-                                formWorkOutput: '',
-                                editingLogId: null,
-
-                                month: new Date().getMonth(),
-                                year: new Date().getFullYear(),
-
-                                get monthName() { return new Date(this.year, this.month).toLocaleString('default', { month: 'long' }); },
-                                get daysInMonth() { return Array.from({ length: new Date(this.year, this.month + 1, 0).getDate() }, (_, i) => i + 1); },
-                                get blanks() { return Array.from({ length: new Date(this.year, this.month, 1).getDay() }, (_, i) => i); },
-
-                                // Helper to get the full YYYY-MM-DD date string
-                                getFullDateStr(date) {
-                                    return `${this.year}-${String(this.month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-                                },
-                                
-                                // Get all logs for a specific day
-                                getLogs(date) {
-                                    const dateStr = this.getFullDateStr(date);
-                                    let logs = this.timeLogs[dateStr] || [];
-
-                                    // If user is not project lead/admin, only show their own logs
-                                    if (!this.isProjectLead) {
-                                        logs = logs.filter(log => log.user_id === this.currentUserId);
-                                    }
-
-                                    return logs;
-                                },
-
-                                get totalUserHoursThisMonth() {
-                                    let total = 0;
-
-                                    // Loop through all logs
-                                    for (const [dateStr, logs] of Object.entries(this.timeLogs)) {
-                                        const dateObj = new Date(dateStr);
-                                        if (dateObj.getFullYear() === this.year && dateObj.getMonth() === this.month) {
-                                            logs.forEach(log => {
-                                                // Only count current user's logs, and skip declined ones
-                                                if (log.user_id === this.currentUserId && log.status !== 'Declined') {
-                                                    total += parseFloat(log.hours);
-                                                }
-                                            });
-                                        }
-                                    }
-                                    return total.toFixed(2);
-                                },
-
-                                // Total hours for *all users* (for leads)
-                                get totalTeamHoursThisMonth() {
-                                    if (!this.isProjectLead) return null; // skip if not a lead
-
-                                    let total = 0;
-                                    for (const [dateStr, logs] of Object.entries(this.timeLogs)) {
-                                        const dateObj = new Date(dateStr);
-                                        if (dateObj.getFullYear() === this.year && dateObj.getMonth() === this.month) {
-                                            logs.forEach(log => {
-                                                if (log.status !== 'Declined') {
-                                                    total += parseFloat(log.hours);
-                                                }
-                                            });
-                                        }
-                                    }
-                                    return total.toFixed(2);
-                                },
-
-                                // Get total hours for a specific day
-                                getTotalHours(date) {
-                                    const logs = this.getLogs(date);
-                                    if (!logs.length) return 0;
-
-                                    // Sum only *approved* or *pending* hours (skip declined)
-                                    return logs.reduce((total, log) => {
-                                        return (log.status !== 'Declined') ? total + parseFloat(log.hours) : total;
-                                    }, 0).toFixed(2);
-                                },
-
-                                // Get class for the calendar day
-                                getDayClass(date) {
-                                    const dateStr = this.getFullDateStr(date);
-                                    // Gray out invalid (non-loggable) dates
-                                    if (!this.isDateAllowed(dateStr)) {
-                                        return 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60';
-                                    }
-
-                                    const logs = this.getLogs(date);
-                                    if (logs.length === 0) return 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600';
-                                    if (logs.some(l => l.status === 'Pending')) return 'bg-yellow-200 dark:bg-yellow-600 hover:bg-yellow-300';
-                                    if (logs.every(l => l.status === 'Approved')) return 'bg-green-200 dark:bg-green-700 hover:bg-green-300';
-                                    if (logs.every(l => l.status === 'Declined')) return 'bg-red-200 dark:bg-red-700 hover:bg-red-300';
-                                    return 'bg-blue-100 dark:bg-blue-800 hover:bg-blue-200'; // Mixed statuses
-                                },
-                                
-                                getCurrentTime() {
-                                    const now = new Date();
-                                    const hours = String(now.getHours()).padStart(2, '0');
-                                    const minutes = String(now.getMinutes()).padStart(2, '0');
-                                    return `${hours}:${minutes}`;
-                                },
-
-                                // Open the modal and set its state
-                                openModal(date) {
-                                    const dateStr = this.getFullDateStr(date);
-
-                                    if (!this.isDateAllowed(dateStr)) {
-                                        alert('You cannot log time outside the project duration or beyond today.');
-                                        return;
-                                    }
-
-                                    this.selectedDate = dateStr;
-                                    this.selectedDateFormatted = new Date(this.year, this.month, date)
-                                        .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                                    this.rawSelectedLogs = this.timeLogs[dateStr] || [];
-                                    this.resetForm();
-                                    this.showModal = true;
-                                    this.logFilter = 'all';
-                                },
-                                                                
-                                closeModal() {
-                                    this.showModal = false;
-                                    this.selectedDate = null;
-                                    this.selectedLogs = [];
-                                    this.resetForm();
-                                },
-
-                                // Set up the form for adding a new log
-                                resetForm() {
-                                    this.formTitle = 'Add New Time Log';
-                                    this.formButtonText = 'Save';
-                                    this.formAction = `/projects/${this.projectId}/timelogs`;
-                                    this.formMethod = 'POST';
-                                    this.formTimeIn = '';
-                                    this.formTimeOut = this.getCurrentTime();;
-                                    this.formWorkOutput = '';
-                                    this.editingLogId = null;
-                                },
-
-                                // Set up the form for editing an existing log
-                                editLog(log) {
-                                    this.formTitle = 'Edit Time Log';
-                                    this.formButtonText = 'Update';
-                                    this.formAction = `/projects/${this.projectId}/timelogs/${log.id}`;
-                                    this.formMethod = 'PUT';
-                                    this.formTimeIn = log.time_in.substring(0, 5);
-                                    this.formTimeOut = log.time_out.substring(0, 5);
-                                    this.formWorkOutput = log.work_output;
-                                    this.editingLogId = log.id;
-                                },
-
-                                submitLogForm(e) {
-                                    const form = e.target;
-                                    const formData = new FormData(form);
-
-                                    // Get the ACTUAL values from the model (not the display)
-                                    const timeIn = this.formTimeIn;   // e.g., "08:00"
-                                    const timeOut = this.formTimeOut; // e.g., "08:45"
-
-                                    if (!timeIn || !timeOut) {
-                                        alert('Please enter valid times.');
-                                        return;
-                                    }
+                            function timeLogCalendar(data) {
+                                return {
+                                    // ... (all your existing properties like weekdays, timeLogs, etc., remain unchanged) ...
+                                    weekdays: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+                                    timeLogs: data.timeLogs || {},
+                                    currentUserId: data.currentUserId,
+                                    isProjectLead: data.isProjectLead,
+                                    projectId: data.projectId,
+                                    selectedDateFormatted: '',
+                                    logFilter: 'all',
+                                    projectStart: data.projectStart,
+                                    projectEnd: data.projectEnd,
                                     
-                                    fetch(this.formAction, {
-                                        method: this.formMethod, // PUT
-                                        headers: {
-                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                            'Accept': 'application/json',
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify({
-                                            date: this.selectedDate,
-                                            time_in: this.formTimeIn,
-                                            time_out: this.formTimeOut,
-                                            work_output: this.formWorkOutput
+                                    isDateAllowed(dateStr) {
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0); 
+                                        const date = new Date(dateStr);
+                                        date.setHours(0, 0, 0, 0);
+                                        const start = new Date(this.projectStart);
+                                        start.setHours(0, 0, 0, 0);
+                                        const end = new Date(this.projectEnd);
+                                        end.setHours(0, 0, 0, 0);
+                                        return date >= start && date <= end && date <= today;
+                                    },
+                                    showModal: false,
+                                    selectedDate: null,    // 'YYYY-MM-DD'
+                                    rawSelectedLogs: [],
+                                    get selectedLogs() {
+                                        if (this.logFilter === 'mine') {
+                                            return this.rawSelectedLogs.filter(log => log.user_id === this.currentUserId);
+                                        }
+                                        return this.rawSelectedLogs;
+                                    },
+                                    formTitle: 'Add Time Log',
+                                    formButtonText: 'Save',
+                                    formAction: '',
+                                    formMethod: 'POST',
+                                    formTimeIn: '',
+                                    formTimeOut: '',
+                                    formWorkOutput: '',
+                                    editingLogId: null,
+                                    month: new Date().getMonth(),
+                                    year: new Date().getFullYear(),
+                                    get monthName() { return new Date(this.year, this.month).toLocaleString('default', { month: 'long' }); },
+                                    get daysInMonth() { return Array.from({ length: new Date(this.year, this.month + 1, 0).getDate() }, (_, i) => i + 1); },
+                                    get blanks() { return Array.from({ length: new Date(this.year, this.month, 1).getDay() }, (_, i) => i); },
+                                    getFullDateStr(date) {
+                                        return `${this.year}-${String(this.month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+                                    },
+                                    getLogs(date) {
+                                        const dateStr = this.getFullDateStr(date);
+                                        let logs = this.timeLogs[dateStr] || [];
+                                        if (!this.isProjectLead) {
+                                            logs = logs.filter(log => log.user_id === this.currentUserId);
+                                        }
+                                        return logs;
+                                    },
+                                    get totalUserHoursThisMonth() {
+                                        let total = 0;
+                                        for (const [dateStr, logs] of Object.entries(this.timeLogs)) {
+                                            const dateObj = new Date(dateStr);
+                                            if (dateObj.getFullYear() === this.year && dateObj.getMonth() === this.month) {
+                                                logs.forEach(log => {
+                                                    if (log.user_id === this.currentUserId && log.status !== 'Declined') {
+                                                        total += parseFloat(log.hours);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        return total.toFixed(2);
+                                    },
+                                    get totalTeamHoursThisMonth() {
+                                        if (!this.isProjectLead) return null; 
+                                        let total = 0;
+                                        for (const [dateStr, logs] of Object.entries(this.timeLogs)) {
+                                            const dateObj = new Date(dateStr);
+                                            if (dateObj.getFullYear() === this.year && dateObj.getMonth() === this.month) {
+                                                logs.forEach(log => {
+                                                    if (log.status !== 'Declined') {
+                                                        total += parseFloat(log.hours);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        return total.toFixed(2);
+                                    },
+                                    getTotalHours(date) {
+                                        const logs = this.getLogs(date);
+                                        if (!logs.length) return 0;
+                                        return logs.reduce((total, log) => {
+                                            return (log.status !== 'Declined') ? total + parseFloat(log.hours) : total;
+                                        }, 0).toFixed(2);
+                                    },
+                                    getDayClass(date) {
+                                        const dateStr = this.getFullDateStr(date);
+                                        if (!this.isDateAllowed(dateStr)) {
+                                            return 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60';
+                                        }
+                                        const logs = this.getLogs(date);
+                                        if (logs.length === 0) return 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600';
+                                        if (logs.some(l => l.status === 'Pending')) return 'bg-yellow-200 dark:bg-yellow-600 hover:bg-yellow-300';
+                                        if (logs.every(l => l.status === 'Approved')) return 'bg-green-200 dark:bg-green-700 hover:bg-green-300';
+                                        if (logs.every(l => l.status === 'Declined')) return 'bg-red-200 dark:bg-red-700 hover:bg-red-300';
+                                        return 'bg-blue-100 dark:bg-blue-800 hover:bg-blue-200';
+                                    },
+                                    getCurrentTime() {
+                                        const now = new Date();
+                                        const hours = String(now.getHours()).padStart(2, '0');
+                                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                                        return `${hours}:${minutes}`;
+                                    },
+                                    openModal(date) {
+                                        const dateStr = this.getFullDateStr(date);
+                                        if (!this.isDateAllowed(dateStr)) {
+                                            alert('You cannot log time outside the project duration or beyond today.');
+                                            return;
+                                        }
+                                        this.selectedDate = dateStr;
+                                        this.selectedDateFormatted = new Date(this.year, this.month, date)
+                                            .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                                        this.rawSelectedLogs = this.timeLogs[dateStr] || [];
+                                        this.resetForm();
+                                        this.showModal = true;
+                                        this.logFilter = 'all';
+                                    },
+                                    closeModal() {
+                                        this.showModal = false;
+                                        this.selectedDate = null;
+                                        this.selectedLogs = [];
+                                        this.resetForm();
+                                    },
+                                    resetForm() {
+                                        this.formTitle = 'Add New Time Log';
+                                        this.formButtonText = 'Save';
+                                        this.formAction = `/projects/${this.projectId}/timelogs`;
+                                        this.formMethod = 'POST';
+                                        this.formTimeIn = '';
+                                        this.formTimeOut = this.getCurrentTime();;
+                                        this.formWorkOutput = '';
+                                        this.editingLogId = null;
+                                    },
+                                    editLog(log) {
+                                        this.formTitle = 'Edit Time Log';
+                                        this.formButtonText = 'Update';
+                                        this.formAction = `/projects/${this.projectId}/timelogs/${log.id}`;
+                                        this.formMethod = 'PUT';
+                                        this.formTimeIn = log.time_in.substring(0, 5);
+                                        this.formTimeOut = log.time_out.substring(0, 5);
+                                        this.formWorkOutput = log.work_output;
+                                        this.editingLogId = log.id;
+                                    },
+
+                                    // ==========================================================
+                                    //  NEW HELPER FUNCTIONS
+                                    // ==========================================================
+                                    _addLogToState(newLog) {
+                                        const dateStr = newLog.date.substring(0, 10); // Get YYYY-MM-DD
+                                        if (!this.timeLogs[dateStr]) {
+                                            this.timeLogs[dateStr] = [];
+                                        }
+                                        this.timeLogs[dateStr].push(newLog);
+                                        
+                                        // If the modal is open for this day, add to it
+                                        if (this.selectedDate === dateStr) {
+                                            this.rawSelectedLogs.push(newLog);
+                                        }
+                                    },
+
+                                    _updateLogState(updatedLog) {
+                                        const dateStr = updatedLog.date.substring(0, 10); // Get YYYY-MM-DD
+                                        
+                                        // Update in the main timeLogs object
+                                        if (this.timeLogs[dateStr]) {
+                                            const index = this.timeLogs[dateStr].findIndex(l => l.id === updatedLog.id);
+                                            if (index > -1) {
+                                                this.timeLogs[dateStr][index] = updatedLog;
+                                            }
+                                        }
+                                        
+                                        // Update in the modal's list (if it's the selected day)
+                                        if (this.selectedDate === dateStr) {
+                                            const index = this.rawSelectedLogs.findIndex(l => l.id === updatedLog.id);
+                                            if (index > -1) {
+                                                this.rawSelectedLogs[index] = updatedLog;
+                                            }
+                                        }
+                                    },
+
+                                    _removeLogFromState(logId, dateStr) {
+                                        if (this.timeLogs[dateStr]) {
+                                            this.timeLogs[dateStr] = this.timeLogs[dateStr].filter(log => log.id !== logId);
+                                        }
+                                        if (this.selectedDate === dateStr) {
+                                            this.rawSelectedLogs = this.rawSelectedLogs.filter(log => log.id !== logId);
+                                        }
+                                    },
+
+
+                                    // ==========================================================
+                                    //  UPDATED: submitLogForm
+                                    // ==========================================================
+                                    submitLogForm(e) {
+                                        // ... (fetch logic remains the same) ...
+                                        fetch(this.formAction, {
+                                            method: this.formMethod, 
+                                            headers: {
+                                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                                'Accept': 'application/json',
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify({
+                                                date: this.selectedDate,
+                                                time_in: this.formTimeIn,
+                                                time_out: this.formTimeOut,
+                                                work_output: this.formWorkOutput,
+                                                _method: this.formMethod
+                                            })
                                         })
-                                    })
-                                    .then(response => {
-                                        if (!response.ok) {
-                                            return response.json().then(data => {
-                                                if (data.errors) {
-                                                    const errorMessages = Object.values(data.errors).flat().join('\n');
-                                                    alert(errorMessages);
-                                                } else {
-                                                    alert('An unknown error occurred.');
-                                                }
-                                                return Promise.reject(data);
-                                            });
-                                        }
-                                        return response.json();
-                                    })
-                                    .then(data => {
-                                        location.reload();
-                                    })
-                                    .catch(async errorData => {
-                                        console.error("Fetch failed:", errorData);
-                                        if (!errorData.errors) {
-                                            alert('An unknown error occurred — check console for details.');
-                                        }
-                                    });
-                                },
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                return response.json().then(data => {
+                                                    if (data.errors) {
+                                                        const errorMessages = Object.values(data.errors).flat().join('\n');
+                                                        alert(errorMessages);
+                                                    } else {
+                                                        alert('An unknown error occurred.');
+                                                    }
+                                                    return Promise.reject(data);
+                                                });
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            // ===== THIS IS THE NEW CLEANER CODE =====
+                                            const newLog = data.log;
 
-                                deleteLog(logId) {
-                                    if (!confirm('Are you sure you want to delete this time log?')) {
-                                        return;
+                                            if (this.editingLogId) {
+                                                this._updateLogState(newLog); // Update
+                                            } else {
+                                                this._addLogToState(newLog); // Add
+                                            }
+                                            
+                                            this.resetForm();
+                                            // ===== END OF NEW CODE =====
+                                        })
+                                        .catch(async errorData => {
+                                            console.error("Fetch failed:", errorData);
+                                            if (!errorData.errors) {
+                                                alert('An unknown error occurred — check console for details.');
+                                            }
+                                        });
+                                    },
+
+                                    // ==========================================================
+                                    //  UPDATED: deleteLog
+                                    // ==========================================================
+                                    deleteLog(logId) {
+                                        if (!confirm('Are you sure you want to delete this time log?')) {
+                                            return;
+                                        }
+
+                                        fetch(`/projects/${this.projectId}/timelogs/${logId}`, {
+                                            method: 'DELETE',
+                                            headers: {
+                                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                                'Accept': 'application/json',
+                                            }
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                return response.json().then(data => Promise.reject(data));
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            // ===== THIS IS THE NEW CLEANER CODE =====
+                                            const dateStr = this.selectedDate;
+                                            const deletedLogId = data.log_id; 
+
+                                            this._removeLogFromState(deletedLogId, dateStr);
+                                            
+                                            if (this.editingLogId === deletedLogId) {
+                                                this.resetForm();
+                                            }
+                                            // ===== END OF NEW CODE =====
+                                        })
+                                        .catch(errorData => {
+                                            alert('An error occurred while deleting the log.');
+                                            console.error(errorData);
+                                        });
+                                    },
+                                    
+                                    // ==========================================================
+                                    //  NEW FUNCTIONS: approveLog & declineLog
+                                    // ==========================================================
+                                    approveLog(log) {
+                                        if (!confirm('Are you sure you want to approve this time log?')) {
+                                            return;
+                                        }
+
+                                        fetch(`/projects/${this.projectId}/timelogs/${log.id}/approve`, {
+                                            method: 'POST', // Laravel uses POST for this route
+                                            headers: {
+                                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                                'Accept': 'application/json',
+                                                'Content-Type': 'application/json'
+                                            }
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                return response.json().then(data => Promise.reject(data));
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            // It worked! Update the log in our list
+                                            this._updateLogState(data.log);
+                                        })
+                                        .catch(errorData => {
+                                            alert('An error occurred while approving the log.');
+                                            console.error(errorData);
+                                        });
+                                    },
+
+                                    declineLog(log, reason) {
+                                        if (!reason || reason.trim() === '') {
+                                            alert('A reason is required to decline a time log.');
+                                            return;
+                                        }
+                                        if (!confirm('Are you sure you want to decline this time log?')) {
+                                            return;
+                                        }
+
+                                        fetch(`/projects/${this.projectId}/timelogs/${log.id}/decline`, {
+                                            method: 'POST', // Laravel route
+                                            headers: {
+                                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                                'Accept': 'application/json',
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify({
+                                                decline_reason: reason
+                                            })
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                return response.json().then(data => Promise.reject(data));
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            // It worked! Update the log in our list
+                                            this._updateLogState(data.log);
+                                            
+                                            // We're inside an x-data, so we can't reset the `declineReason` from here.
+                                            // But the component will re-render and the x-show will hide the input,
+                                            // and the `declineReason` is tied to the `div` which will be recreated next time.
+                                        })
+                                        .catch(errorData => {
+                                            alert('An error occurred while declining the log.');
+                                            console.error(errorData);
+                                        });
+                                    },
+
+                                    // ==========================================================
+                                    //  UNCHANGED FUNCTIONS
+                                    // ==========================================================
+                                    prevMonth() {
+                                        if (this.month === 0) {
+                                            this.month = 11;
+                                            this.year -= 1;
+                                        } else {
+                                            this.month -= 1;    
+                                        }
+                                    },
+
+                                    nextMonth() {
+                                        if (this.month === 11) {
+                                            this.month = 0;
+                                            this.year += 1;
+                                        } else {
+                                            this.month += 1;
+                                        }
+                                    },
+
+                                    formatTime(timeStr) {
+                                        if (!timeStr) return '';
+                                        let [h, m] = timeStr.split(':');
+                                        let ampm = h >= 12 ? 'PM' : 'AM';
+                                        h = h % 12 || 12; // 0 or 12 -> 12
+                                        return `${h}:${m} ${ampm}`;
                                     }
-
-                                    fetch(`/projects/${this.projectId}/timelogs/${logId}`, {
-                                        method: 'DELETE',
-                                        headers: {
-                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                            'Accept': 'application/json',
-                                        }
-                                    })
-                                    .then(response => {
-                                        if (!response.ok) {
-                                            return response.json().then(data => Promise.reject(data));
-                                        }
-                                        return response.json();
-                                    })
-                                    .then(data => {
-                                        // It worked! Reload the page.
-                                        location.reload(); 
-                                    })
-                                    .catch(errorData => {
-                                        alert('An error occurred while deleting the log.');
-                                        console.error(errorData);
-                                    });
-                                },
-                                
-                                prevMonth() {
-                                    if (this.month === 0) {
-                                        this.month = 11;
-                                        this.year -= 1;
-                                    } else {
-                                        this.month -= 1;    
-                                    }
-                                },
-
-                                nextMonth() {
-                                    if (this.month === 11) {
-                                        this.month = 0;
-                                        this.year += 1;
-                                    } else {
-                                        this.month += 1;
-                                    }
-                                },
-
-                                // Helper for formatting time
-                                formatTime(timeStr) {
-                                    if (!timeStr) return '';
-                                    let [h, m] = timeStr.split(':');
-                                    let ampm = h >= 12 ? 'PM' : 'AM';
-                                    h = h % 12 || 12; // 0 or 12 -> 12
-                                    return `${h}:${m} ${ampm}`;
                                 }
                             }
-                        }
-                        </script>
+                            </script>
                     </div>
                 </div>
             </div>
