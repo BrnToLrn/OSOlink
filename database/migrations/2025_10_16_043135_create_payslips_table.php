@@ -19,7 +19,7 @@ return new class extends Migration {
             $table->decimal('gross_pay', 10, 2);
             $table->decimal('adjustments', 10, 2)->default(0);
             $table->decimal('net_pay', 10, 2);
-            // $table->boolean('is_paid')->default(false);
+            $table->boolean('is_paid')->default(false);
             // foreign id cash loan periodly deductions;  divide by how many periods to be paid off
             $table->timestamps();
         });

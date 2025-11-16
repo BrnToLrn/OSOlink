@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -10,13 +11,15 @@ return new class extends Migration
     {
         Schema::create('cash_loans', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
 
-            // Fields (aligned with leaves)
+            // Core fields
             $table->date('date_requested')->default(DB::raw('CURRENT_DATE'));
             $table->decimal('amount', 10, 2);
-            $table->string('type', 100);                 // Emergency, Personal, etc.
-            $table->string('status', 50)->default('Pending');     // Pending, Approved, Denied
+            $table->unsignedTinyInteger('pay_periods')->default(1); // 1..6 periods
+            $table->string('type', 100);
+            $table->string('status', 50)->default('Pending'); // Pending, Approved, Rejected, Active, Fully Paid, Cancelled
             $table->text('remarks')->nullable();
 
             $table->timestamps();
@@ -24,7 +27,9 @@ return new class extends Migration
             // Indexes
             $table->index(['user_id', 'status']);
             $table->index('date_requested');
+            $table->index('pay_periods');
         });
+        
     }
 
     public function down(): void

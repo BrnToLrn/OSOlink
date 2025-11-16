@@ -13,61 +13,85 @@
                     </div>
                 </header>
 
-                <form method="POST" action="{{ route('cashloans.update', $loan) }}" class="mt-6 space-y-6">
+                <form method="POST" action="{{ route('cashloans.update', $loan) }}" class="mt-6 space-y-8">
                     @csrf
                     @method('PUT')
 
-                    <!-- Hidden fields -->
+                    <!-- Hidden fields (kept for compatibility) -->
                     <input type="hidden" name="user_id" value="{{ old('user_id', $loan->user_id) }}">
                     <input type="hidden" name="status" value="{{ old('status', $loan->status) }}">
 
-                    <div class="flex items-center gap-4 mt-4">
-                        <!-- Date Requested (read-only & grayed out) -->
-                        <div class="flex-1">
-                            <x-input-label for="date_requested" :value="__('Date Requested')" />
-                            <x-text-input
-                                id="date_requested"
-                                name="date_requested"
-                                type="date"
-                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
-                                :value="old('date_requested', \Carbon\Carbon::parse($loan->date_requested)->format('Y-m-d'))"
-                                readonly
-                                required />
-                            <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
-                        </div>
-
-                        <!-- Amount (CA$) -->
-                        <div class="flex-1">
-                            <x-input-label for="amount" :value="__('Amount (CA$)')" />
-                            <div class="relative">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
+                    <!-- Two-column: left (date + pay periods), right (amount + remarks) -->
+                    <div class="flex flex-col md:flex-row gap-8">
+                        <!-- Left column -->
+                        <div class="flex-1 space-y-6">
+                            <!-- Date Requested (read-only) -->
+                            <div>
+                                <x-input-label for="date_requested" :value="__('Date Requested')" />
                                 <x-text-input
-                                    id="amount"
-                                    name="amount"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    class="mt-1 block w-full pl-14"
-                                    :value="old('amount', $loan->amount)"
+                                    id="date_requested"
+                                    name="date_requested"
+                                    type="date"
+                                    class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
+                                    :value="old('date_requested', \Carbon\Carbon::parse($loan->date_requested)->format('Y-m-d'))"
+                                    readonly
                                     required />
+                                <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
                             </div>
-                            <x-input-error class="mt-2" :messages="$errors->get('amount')" />
+
+                            <!-- Pay Periods -->
+                            <div>
+                                <x-input-label for="pay_periods" :value="__('Pay Periods')" />
+                                <select id="pay_periods" name="pay_periods" required
+                                    class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300
+                                           focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600
+                                           rounded-md shadow-sm">
+                                    @for($i=1;$i<=6;$i++)
+                                        <option value="{{ $i }}" {{ (int)old('pay_periods', $loan->pay_periods) === $i ? 'selected' : '' }}>
+                                            {{ $i }} {{ $i === 1 ? 'period' : 'periods' }}
+                                        </option>
+                                    @endfor
+                                </select>
+                                <x-input-error class="mt-2" :messages="$errors->get('pay_periods')" />
+                            </div>
+                        </div>
+
+                        <!-- Right column -->
+                        <div class="flex-1 space-y-6">
+                            <!-- Amount -->
+                            <div>
+                                <x-input-label for="amount" :value="__('Amount')" />
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
+                                    <x-text-input
+                                        id="amount"
+                                        name="amount"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        class="mt-1 block w-full pl-14"
+                                        :value="old('amount', $loan->amount)"
+                                        required />
+                                </div>
+                                <x-input-error class="mt-2" :messages="$errors->get('amount')" />
+                            </div>
+
+                            <!-- Purpose / Remarks -->
+                            <div>
+                                <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
+                                <x-text-input
+                                    id="remarks"
+                                    name="remarks"
+                                    type="text"
+                                    class="mt-1 block w-full"
+                                    :value="old('remarks', $loan->remarks)" />
+                                <x-input-error class="mt-2" :messages="$errors->get('remarks')" />
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Remarks -->
-                    <div>
-                        <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
-                        <x-text-input
-                            id="remarks"
-                            name="remarks"
-                            type="text"
-                            class="mt-1 block w-full"
-                            :value="old('remarks', $loan->remarks)" />
-                        <x-input-error class="mt-2" :messages="$errors->get('remarks')" />
-                    </div>
-
-                    <div class="flex items-center gap-4 mt-4">
+                    <!-- Type & Status row -->
+                    <div class="flex flex-col md:flex-row gap-8">
                         <!-- Type -->
                         <div class="flex-1">
                             <x-input-label for="type" :value="__('Type of Loan')" />

@@ -13,42 +13,68 @@
                     </div>
                 </header>
 
-                <form method="POST" action="{{ route('cashloans.store') }}" class="mt-6 space-y-6">
+                <form method="POST" action="{{ route('cashloans.store') }}" class="mt-6 space-y-8">
                     @csrf
 
-                    <!-- Date Requested & Amount -->
-                    <div class="flex items-center gap-4 mt-4">
-                        <div class="flex-1">
-                            <x-input-label for="date_requested" :value="__('Date Requested')" />
-                            <x-text-input id="date_requested" name="date_requested" type="date"
-                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
-                                :value="old('date_requested', now()->toDateString())"
-                                readonly required />
-                            <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
-                        </div>
-
-                        <div class="flex-1">
-                            <x-input-label for="amount" :value="__('Amount')" />
-                            <div class="relative">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
-                                <x-text-input id="amount" name="amount" type="number" step="0.01" min="0"
-                                    class="mt-1 block w-full pl-14"
-                                    :value="old('amount')" required />
+                    <!-- Two-column: left (date + pay periods), right (amount + remarks) -->
+                    <div class="flex flex-col md:flex-row gap-8">
+                        <!-- Left column -->
+                        <div class="flex-1 space-y-6">
+                            <!-- Date Requested -->
+                            <div>
+                                <x-input-label for="date_requested" :value="__('Date Requested')" />
+                                <x-text-input id="date_requested" name="date_requested" type="date"
+                                    class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
+                                    :value="old('date_requested', now()->toDateString())"
+                                    readonly required />
+                                <x-input-error class="mt-2" :messages="$errors->get('date_requested')" />
                             </div>
-                            <x-input-error class="mt-2" :messages="$errors->get('amount')" />
-                        </div>
-                    </div>
 
-                    <!-- Remarks -->
-                    <div>
-                        <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
-                        <x-text-input id="remarks" name="remarks" type="text" class="mt-1 block w-full"
-                            :value="old('remarks')" />
-                        <x-input-error class="mt-2" :messages="$errors->get('remarks')" />
+                            <!-- Pay Periods -->
+                            <div>
+                                <x-input-label for="pay_periods" :value="__('Pay Periods')" />
+                                <select id="pay_periods" name="pay_periods" required
+                                    class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300
+                                           focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600
+                                           rounded-md shadow-sm">
+                                    <option value="">Select periods</option>
+                                    @for($i=1;$i<=6;$i++)
+                                        <option value="{{ $i }}" {{ (int)old('pay_periods')===$i ? 'selected' : '' }}>
+                                            {{ $i }} {{ $i===1 ? 'period' : 'periods' }}
+                                        </option>
+                                    @endfor
+                                </select>
+                                <x-input-error class="mt-2" :messages="$errors->get('pay_periods')" />
+                            </div>
+                        </div>
+
+                        <!-- Right column -->
+                        <div class="flex-1 space-y-6">
+                            <!-- Amount -->
+                            <div>
+                                <x-input-label for="amount" :value="__('Amount')" />
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">CA$</span>
+                                    <x-text-input id="amount" name="amount" type="number" step="0.01" min="0"
+                                        class="mt-1 block w-full pl-14"
+                                        :value="old('amount')" required />
+                                </div>
+                                <x-input-error class="mt-2" :messages="$errors->get('amount')" />
+                            </div>
+
+                            <!-- Purpose / Remarks -->
+                            <div>
+                                <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
+                                <x-text-input id="remarks" name="remarks" type="text"
+                                    class="mt-1 block w-full"
+                                    :value="old('remarks')" />
+                                <x-input-error class="mt-2" :messages="$errors->get('remarks')" />
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Type & Status -->
-                    <div class="flex items-center gap-4 mt-4">
+                    <div class="flex flex-col md:flex-row gap-8">
                         <div class="flex-1">
                             <x-input-label for="type" :value="__('Type of Loan')" />
                             <select id="type" name="type" required
@@ -72,10 +98,11 @@
                         </div>
                     </div>
 
+                    <!-- Actions -->
                     <div class="flex items-center gap-4">
                         <x-primary-button>Create</x-primary-button>
-                        @if (session('success'))
-                            <p class="text-sm text-green-600 dark:text-green-400">{{ session('success') }}</p>
+                        @if (session('create_success'))
+                            <p class="text-sm text-green-600 dark:text-green-400">{{ session('create_success') }}</p>
                         @endif
                     </div>
                 </form>
@@ -83,12 +110,10 @@
         </div>
     </div>
 
-    <!-- Optional: refresh visible date after midnight if the tab stays open -->
     <script>
         (function () {
             const dateInput = document.getElementById('date_requested');
             if (!dateInput) return;
-
             function setToday() {
                 const d = new Date();
                 const v = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -97,7 +122,7 @@
             setToday();
             const now = new Date();
             const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
-            setTimeout(() => setToday(), nextMidnight - now);
+            setTimeout(setToday, nextMidnight - now);
         })();
     </script>
 </x-app-layout>

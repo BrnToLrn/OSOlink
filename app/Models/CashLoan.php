@@ -13,11 +13,13 @@ class CashLoan extends Model
         'type',
         'status',
         'remarks',
+        'pay_periods', // 1..6
     ];
 
     protected $casts = [
         'date_requested' => 'date',
         'amount'         => 'decimal:2',
+        'pay_periods'    => 'integer',
     ];
 
     public function user()
