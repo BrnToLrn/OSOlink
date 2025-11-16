@@ -89,7 +89,7 @@
             <div class="flex-1">
                 <x-input-label for="adjustments" :value="__('Adjustments')" />
                 <div class="relative mt-1">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm text-gray-400 dark:text-gray-400 opacity-70 pointer-events-none">CA$</span>
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm text-gray-600 dark:text-gray-300 pointer-events-none">CA$</span>
                     <x-text-input id="adjustments" name="adjustments" type="number" step="0.01" class="mt-1 block w-full pl-14" value="{{ old('adjustments', 0) }}" />
                 </div>
             </div>

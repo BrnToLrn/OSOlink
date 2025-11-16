@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Leave;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class LeaveController extends Controller
 {
@@ -40,8 +41,9 @@ class LeaveController extends Controller
 
     public function store(Request $request)
     {
+        // Force start_date = "today" in the correct timezone so midnight rolls over properly
         $request->merge([
-            'start_date' => now()->toDateString(),
+            'start_date' => Carbon::today($this->resolvedTimezone())->toDateString(),
             'status'     => 'Pending',
         ]);
 
@@ -76,6 +78,11 @@ class LeaveController extends Controller
     {
         $this->authorizeMutable($leave);
 
+        // Keep start_date fixed to "today" in the resolved timezone
+        $request->merge([
+            'start_date' => Carbon::today($this->resolvedTimezone())->toDateString(),
+        ]);
+
         $data = $request->validate([
             'start_date' => ['required','date'],
             'end_date'   => ['required','date','after_or_equal:start_date'],
@@ -84,6 +91,7 @@ class LeaveController extends Controller
             'status'     => ['nullable','string','in:Pending,Approved,Rejected'],
         ]);
 
+        // Users cannot flip status here; admin pages handle approvals
         if (!$this->isAdmin()) {
             $data['status'] = 'Pending';
         }
@@ -122,6 +130,14 @@ class LeaveController extends Controller
         $this->authorizeAdmin();
         $leave->update(['status' => 'Pending']);
         return back()->with('admin_update_success', 'Leave status set to Pending.');
+    }
+
+    // ---- Helpers ----
+
+    private function resolvedTimezone(): string
+    {
+        // Prefer per-user timezone if your users table has it; otherwise use app timezone
+        return (string) (Auth::user()->timezone ?? config('app.timezone', 'UTC'));
     }
 
     private function isAdmin(): bool
