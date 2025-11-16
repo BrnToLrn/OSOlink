@@ -10,7 +10,7 @@
         </div>
     </header>
 
-    <!-- Filter / Sorter (added) -->
+    <!-- Filter / Sorter -->
     <div class="mt-6 mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         <form method="GET" action="{{ request()->url() }}" class="flex flex-wrap gap-3 items-center">
             <!-- Search (by user name or reason) -->
@@ -58,8 +58,11 @@
                     Apply
                 </x-primary-button>
 
-                @if (session('admin_update_success'))
-                    <p class="text-sm text-green-600 dark:text-green-400">{{ session('admin_update_success') }}</p>
+                {{-- Only global/admin flash here --}}
+                @if (session('global_update_success'))
+                    <p class="text-sm font-medium text-green-600 dark:text-green-400">
+                        {{ session('global_update_success') }}
+                    </p>
                 @endif
             </div>
         </form>
@@ -79,6 +82,13 @@
             </thead>
             <tbody class="divide-gray-200 dark:bg-gray-900 text-sm">
                 @forelse ($leaves as $leave)
+                    @php
+                        $status = $leave->status ?? 'Pending';
+                        $s = strtolower($status);
+                        $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
+                                     : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
+                                     : 'text-yellow-600 dark:text-yellow-400');
+                    @endphp
                     <tr>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             {{ $leave->user->first_name }} {{ $leave->user->middle_name }} {{ $leave->user->last_name }}
@@ -95,13 +105,6 @@
                         </td>
 
                         <td class="px-4 py-2 text-center">
-                            @php
-                                $status = $leave->status ?? 'Pending';
-                                $s = strtolower($status);
-                                $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
-                                             : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
-                                             : 'text-yellow-600 dark:text-yellow-400');
-                            @endphp
                             <span class="{{ $statusClass }}">{{ ucfirst($status) }}</span>
                         </td>
 
@@ -116,7 +119,7 @@
 
                                 <form action="{{ route('leaves.reject', $leave) }}" method="POST" class="m-0">
                                     @csrf
-                                    <button type="submit" class="text-red-600 hover:underline">Reject</button>
+                                    <button type="submit" class="text-red-600 dark:text-red-400 hover:underline">Reject</button>
                                 </form>
 
                                 <form action="{{ route('leaves.pending', $leave) }}" method="POST" class="m-0">
