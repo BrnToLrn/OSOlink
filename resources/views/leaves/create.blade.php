@@ -17,21 +17,20 @@
                     @csrf
 
                     <div class="flex items-center gap-4 mt-4">
-                        <!-- Start Date (autofilled to today, read-only and grayed out) -->
+                        <!-- Start Date (editable) -->
                         <div class="flex-1">
                             <x-input-label for="start_date" :value="__('Start Date')" />
                             <x-text-input
                                 id="start_date"
                                 name="start_date"
                                 type="date"
-                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
-                                :value="old('start_date', now()->toDateString())"
-                                readonly
+                                class="mt-1 block w-full"
+                                :value="old('start_date')"
                                 required />
                             <x-input-error class="mt-2" :messages="$errors->get('start_date')" />
                         </div>
 
-                        <!-- End Date -->
+                        <!-- End Date (must be strictly after start) -->
                         <div class="flex-1">
                             <x-input-label for="end_date" :value="__('End Date')" />
                             <x-text-input
@@ -39,7 +38,6 @@
                                 name="end_date"
                                 type="date"
                                 class="mt-1 block w-full"
-                                :min="old('start_date', now()->toDateString())"
                                 :value="old('end_date')"
                                 required />
                             <x-input-error class="mt-2" :messages="$errors->get('end_date')" />
@@ -53,7 +51,7 @@
                         <x-input-error class="mt-2" :messages="$errors->get('reason')" />
                     </div>
 
-                    <div class="flex items-center gap-4 mt-4">
+                    <div class="flex items-centered gap-4 mt-4">
                         <!-- Type -->
                         <div class="flex-1">
                             <x-input-label for="type" :value="__('Type of Leave')" />
@@ -92,21 +90,51 @@
         </div>
     </div>
 
-    <!-- Keep end_date >= start_date -->
+    <!-- Default start to local today (editable); end must be > start; roll default at local midnight if untouched) -->
     <script>
         (function () {
             const start = document.getElementById('start_date');
             const end = document.getElementById('end_date');
             if (!start || !end) return;
 
-            function syncMin() {
-                if (start.value) {
-                    end.min = start.value;
-                    if (end.value && end.value < start.value) end.value = start.value;
-                }
+            const pad = n => String(n).padStart(2,'0');
+            const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+            const addDays = (d, days) => { const x = new Date(d); x.setDate(x.getDate() + days); return x; };
+
+            let userTouchedStart = false;
+
+            function ensureStartDefaultToday() {
+                if (!start.value) start.value = ymd(new Date());
             }
-            start.addEventListener('change', syncMin);
-            syncMin();
+
+            function syncEndMin() {
+                if (!start.value) return;
+                const s = new Date(start.value + 'T00:00:00');
+                const minEnd = ymd(addDays(s, 1)); // strictly after start
+                end.min = minEnd;
+                if (end.value && end.value < minEnd) end.value = minEnd;
+            }
+
+            function scheduleMidnightRollover() {
+                const now = new Date();
+                const next = new Date(now);
+                next.setHours(24, 0, 1, 0); // 1s after local midnight
+                setTimeout(() => {
+                    if (!userTouchedStart) {
+                        start.value = ymd(new Date());
+                        syncEndMin();
+                    }
+                    scheduleMidnightRollover();
+                }, next - now);
+            }
+
+            // Init
+            ensureStartDefaultToday();
+            syncEndMin();
+            scheduleMidnightRollover();
+
+            start.addEventListener('change', () => { userTouchedStart = true; syncEndMin(); });
+            start.addEventListener('input', () => { userTouchedStart = true; });
         })();
     </script>
 </x-app-layout>

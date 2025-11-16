@@ -18,21 +18,20 @@
                     @method('PUT')
 
                     <div class="flex items-center gap-4 mt-4">
-                        <!-- Start Date (locked & grayed out) -->
+                        <!-- Start Date (editable) -->
                         <div class="flex-1">
                             <x-input-label for="start_date" :value="__('Start Date')" />
                             <x-text-input
                                 id="start_date"
                                 name="start_date"
                                 type="date"
-                                class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-70"
+                                class="mt-1 block w-full"
                                 :value="old('start_date', \Carbon\Carbon::parse($leave->start_date)->format('Y-m-d'))"
-                                readonly
                                 required />
                             <x-input-error class="mt-2" :messages="$errors->get('start_date')" />
                         </div>
 
-                        <!-- End Date -->
+                        <!-- End Date (must be strictly after start) -->
                         <div class="flex-1">
                             <x-input-label for="end_date" :value="__('End Date')" />
                             <x-text-input
@@ -79,7 +78,7 @@
                             <x-input-error class="mt-2" :messages="$errors->get('type')" />
                         </div>
 
-                        <!-- Status -->
+                        <!-- Status (display only) -->
                         <div class="flex-1">
                             <x-input-label for="status_display" :value="__('Status')" />
                             <x-text-input id="status_display" type="text"
@@ -99,4 +98,29 @@
             </div>
         </div>
     </div>
+
+    <!-- Enforce: end_date strictly after start_date -->
+    <script>
+        (function () {
+            const start = document.getElementById('start_date');
+            const end = document.getElementById('end_date');
+            if (!start || !end) return;
+
+            const pad = n => String(n).padStart(2,'0');
+            const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+            const addDays = (d, days) => { const x = new Date(d); x.setDate(x.getDate() + days); return x; };
+
+            function syncEndMin() {
+                if (!start.value) return;
+                const s = new Date(start.value + 'T00:00:00');
+                const minEnd = ymd(addDays(s, 1)); // strictly after start
+                end.min = minEnd;
+                if (end.value && end.value < minEnd) end.value = minEnd;
+            }
+
+            syncEndMin();
+            start.addEventListener('change', syncEndMin);
+            start.addEventListener('input', syncEndMin);
+        })();
+    </script>
 </x-app-layout>

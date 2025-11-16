@@ -185,4 +185,74 @@
         </div>
     </section>
 
+    {{-- Status Change History (only for this user's leaves) --}}
+    @php
+        $history = $statusHistory ?? collect();
+    @endphp
+    <section>
+        <h2 class="mt-10 text-lg font-medium text-gray-900 dark:text-gray-100">Leave Status Change History</h2>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Approvals and rejections tied to your leave requests.</p>
+
+        <div class="mt-4 overflow-x-auto">
+            <table class="rounded-lg overflow-hidden w-full divide-y divide-gray-300 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Leave</th>
+                        <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Period</th>
+                        <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Action</th>
+                        <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">By</th>
+                        <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="dark:bg-gray-900 text-sm">
+                    @forelse ($history as $h)
+                        @php
+                            $action = ucfirst(strtolower($h->action ?? ''));
+                            $actionClass = $action === 'Approved'
+                                ? 'text-green-600 dark:text-green-400'
+                                : ($action === 'Rejected'
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-gray-700 dark:text-gray-300');
+
+                            $leaveItem = $h->leave ?? null;
+                            $by = $h->changedBy ?? null;
+                            $byName = $by
+                                ? trim(($by->first_name ?? '').' '.($by->middle_name ?? '').' '.($by->last_name ?? '')) ?: ($by->name ?? 'User')
+                                : 'System';
+
+                            $startFmt = $leaveItem? \Carbon\Carbon::parse($leaveItem->start_date)->format('M j, Y') : '—';
+                            $endFmt   = $leaveItem? \Carbon\Carbon::parse($leaveItem->end_date)->format('M j, Y')   : '—';
+                            $whenFmt  = $h->occurred_at
+                                ? $h->occurred_at->timezone(config('app.timezone'))->format('M j, Y g:i A')
+                                : '—';
+                        @endphp
+                        <tr>
+                            <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-200">
+                                {{ $leaveItem?->type ?? '—' }}
+                            </td>
+                            <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-200">
+                                {{ $startFmt }} – {{ $endFmt }}
+                            </td>
+                            <td class="px-4 py-2 text-center font-medium {{ $actionClass }}">
+                                {{ $action }}
+                            </td>
+                            <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-200">
+                                {{ $byName }}
+                            </td>
+                            <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-200">
+                                {{ $whenFmt }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">
+                                No status changes recorded yet.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
+
 </section>
