@@ -56,16 +56,7 @@ class ProjectController extends Controller
         // Get all time logs, respecting the project filter
         $timeLogQuery = TimeLog::with('project', 'user') // Eager load for the modal
             ->whereIn('project_id', $allProjectsForFilter->pluck('id')); // Only logs from user's projects
-
-        // !! THIS IS THE CHANGE !!
-        // We REMOVE the filter from the CONTROLLER
-        // The controller ALWAYS sends ALL logs. Alpine.js will do the filtering.
-        
-        // if ($request->filled('project_id')) {
-        //     $timeLogQuery->where('project_id', $request->project_id);
-        // }
-
-        // If not admin, only show their own logs
+            
         if (!$user->is_admin) {
             $timeLogQuery->where('user_id', $user->id);
         }
@@ -112,8 +103,8 @@ class ProjectController extends Controller
             'name' => 'required|string',
             'description' => 'required|string',
             'status' => 'required|in:Not Started,In Progress,On Hold,Completed',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'start_date' => 'required|date', 
+            'end_date' => 'required|date|after_or_equal:start_date', 
             'user_ids' => 'nullable|array',
             'user_ids.*' => 'exists:users,id',
             'project_lead_id' => [
@@ -338,18 +329,22 @@ class ProjectController extends Controller
     public function addTimeLog(Project $project, Request $request)
     {
         $validated = $request->validate([
-            'date' => ['required', 'date'],
+            // THIS IS THE FIX:
+            'date' => [
+                'required', 
+                'date', 
+                // We format as Y-m-d to compare dates only, ignoring time.
+                'after_or_equal:' . $project->start_date->format('Y-m-d'), 
+                'before_or_equal:' . $project->end_date->format('Y-m-d')
+            ],
             'time_in' => 'required|date_format:H:i',
             'time_out' => 'required|date_format:H:i',
             'work_output' => 'required|string|max:2000',
+        ], [
+            // Add custom error messages for clarity
+            'date.after_or_equal' => 'The date must be on or after the project start date.',
+            'date.before_or_equal' => 'The date must be on or before the project end date.',
         ]);
-
-        // Check project boundaries
-        if ($validated['date'] < $project->start_date || $validated['date'] > $project->end_date) {
-            return response()->json([
-                'errors' => ['date' => ['The date must be within the project start and end dates.']]
-            ], 422);
-        }
 
         // Overlap check
         $overlap = $this->hasOverlappingTimeLog($request, auth()->id());
@@ -375,8 +370,6 @@ class ProjectController extends Controller
             'status' => $status,
             'decline_reason' => null,
         ]);
-
-        // $timeLog->load('user'); // No longer needed, helper does it
 
         if ($request->expectsJson()) {
             // ===== THIS IS THE CHANGE =====
