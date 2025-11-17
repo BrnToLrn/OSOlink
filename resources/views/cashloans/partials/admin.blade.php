@@ -5,7 +5,7 @@
                 Manage Global Cash Loans
             </h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Approve, reject, or mark pending global cash loans.
+                Approve, reject, mark ongoing, or mark paid cash loans.
             </p>
         </div>
     </header>
@@ -34,6 +34,9 @@
                 @if (session('admin_update_success'))
                     <p class="text-sm text-green-600 dark:text-green-400">{{ session('admin_update_success') }}</p>
                 @endif
+                @if (session('admin_update_error'))
+                    <p class="text-sm text-red-600 dark:text-red-400">{{ session('admin_update_error') }}</p>
+                @endif
             </div>
         </form>
     </div>
@@ -54,14 +57,16 @@
             <tbody class="divide-gray-200 dark:bg-gray-900 text-sm">
                 @forelse ($loans as $loan)
                     @php
-                        $status = $loan->status ?? 'Pending';
+                        $status = (string)($loan->status ?? 'Pending');
                         $s = strtolower($status);
                         $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
                                      : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
                                      : ($s === 'active' ? 'text-blue-600 dark:text-blue-400'
                                      : ($s === 'fully paid' ? 'text-emerald-600 dark:text-emerald-400'
                                      : 'text-yellow-600 dark:text-yellow-400')));
-                        $locked = in_array($status, ['Active','Fully Paid'], true);
+                        $lockedApproval = in_array($status, ['Active','Fully Paid'], true);
+                        $canMarkActive  = in_array($status, ['Pending','Approved'], true);
+                        $canMarkPaid    = in_array($status, ['Active','Approved'], true);
                     @endphp
                     <tr>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
@@ -84,7 +89,7 @@
                             <div class="inline-flex items-center justify-center gap-3">
                                 <a href="{{ route('cashloans.show', $loan) }}" class="text-blue-600 dark:text-blue-400 hover:underline">View</a>
 
-                                @if(!$locked)
+                                @if(!$lockedApproval)
                                     <form action="{{ route('cashloans.approve', $loan) }}" method="POST" class="m-0">
                                         @csrf
                                         <button type="submit" class="text-green-600 dark:text-green-400 hover:underline">Approve</button>
@@ -93,13 +98,27 @@
                                         @csrf
                                         <button type="submit" class="text-red-600 hover:underline">Reject</button>
                                     </form>
-                                    <form action="{{ route('cashloans.pending', $loan) }}" method="POST" class="m-0">
-                                        @csrf
-                                        <button type="submit" class="text-yellow-600 dark:text-yellow-400 hover:underline">Pending</button>
-                                    </form>
                                 @else
-                                    <span class="text-gray-400 dark:text-gray-500 select-none">Actions disabled</span>
+                                    <span class="text-gray-400 dark:text-gray-500 select-none">Approval disabled</span>
                                 @endif
+
+                                <form action="{{ route('cashloans.activate', $loan) }}" method="POST" class="m-0">
+                                    @csrf
+                                    <button type="submit"
+                                            class="text-blue-600 dark:text-blue-400 hover:underline {{ $canMarkActive ? '' : 'opacity-40 cursor-not-allowed pointer-events-none' }}"
+                                            {{ $canMarkActive ? '' : 'disabled' }}>
+                                        Mark Ongoing
+                                    </button>
+                                </form>
+
+                                <form action="{{ route('cashloans.paid', $loan) }}" method="POST" class="m-0">
+                                    @csrf
+                                    <button type="submit"
+                                            class="text-emerald-600 dark:text-emerald-400 hover:underline {{ $canMarkPaid ? '' : 'opacity-40 cursor-not-allowed pointer-events-none' }}"
+                                            {{ $canMarkPaid ? '' : 'disabled' }}>
+                                        Mark Paid
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>

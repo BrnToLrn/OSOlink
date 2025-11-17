@@ -112,6 +112,9 @@ Route::middleware('auth')->group(function () {
      */
     Route::get('/payslip', [PayslipController::class, 'index'])->name('payslip.index');
     Route::get('/payslip/{payslip}', [PayslipController::class, 'show'])->name('payslip.show');
+    Route::get('/payslip/{payslip}/edit', [PayslipController::class, 'edit'])->name('payslip.edit');
+    Route::put('/payslip/{payslip}', [PayslipController::class, 'update'])->name('payslip.update');
+    Route::delete('/payslip/{payslip}', [PayslipController::class, 'destroy'])->name('payslip.destroy');
 
     Route::middleware('admin')->group(function () {
         Route::get('/payslip/manage', [PayslipController::class, 'manage'])->name('payslip.manage');
@@ -159,7 +162,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('admin')->group(function () {
         Route::post('cashloans/{cashloan}/approve', [CashLoanController::class, 'approve'])->name('cashloans.approve');
         Route::post('cashloans/{cashloan}/reject', [CashLoanController::class, 'reject'])->name('cashloans.reject');
-        Route::post('cashloans/{cashloan}/pending', [CashLoanController::class, 'pending'])->name('cashloans.pending');
+        Route::post('cashloans/{cashloan}/activate', [CashLoanController::class, 'activate'])->name('cashloans.activate'); // Ongoing
+        Route::post('cashloans/{cashloan}/paid',     [CashLoanController::class, 'paid'])->name('cashloans.paid'); // Fully Paid
     });
 });
 

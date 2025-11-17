@@ -8,10 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 class CashLoanController extends Controller
 {
-    // App statuses
-    private array $statuses      = ['Pending','Approved','Rejected','Active','Fully Paid','Cancelled'];
-    // When in these states, edits/deletes and admin approval/rejection are disabled
-    private array $lockedStatus  = ['Active','Fully Paid'];
+    private array $statuses = ['Pending','Approved','Rejected','Active','Fully Paid','Cancelled'];
 
     public function __construct()
     {
@@ -23,18 +20,19 @@ class CashLoanController extends Controller
         return strcasecmp((string)$loan->status, 'Pending') === 0;
     }
 
-    private function isLocked(CashLoan $loan): bool
+    private function approvalLocked(CashLoan $loan): bool
     {
-        return in_array((string)$loan->status, $this->lockedStatus, true);
+        return in_array((string)$loan->status, ['Active','Fully Paid'], true);
     }
 
-    private function userHasOngoing(int $userId): bool
+    private function userHasOngoing(int $userId, ?int $ignoreId = null): bool
     {
-        // Ongoing == Active
-        return CashLoan::where('user_id', $userId)->where('status', 'Active')->exists();
+        return CashLoan::where('user_id', $userId)
+            ->when($ignoreId, fn($q) => $q->where('id', '!=', $ignoreId))
+            ->where('status', 'Active')
+            ->exists();
     }
 
-    // List personal + (if admin) global loans
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -51,8 +49,18 @@ class CashLoanController extends Controller
         if ($user->is_admin ?? false) {
             $globalLoans = CashLoan::with('user')
                 ->when($request->filled('status'), function ($q) use ($request) {
-                    $st = ucfirst(strtolower($request->string('status')));
-                    $q->where('status', $st);
+                    $map = [
+                        'pending' => 'Pending',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                        'active' => 'Active',
+                        'fully paid' => 'Fully Paid',
+                        'cancelled' => 'Cancelled',
+                    ];
+                    $key = strtolower((string)$request->get('status'));
+                    if (isset($map[$key])) {
+                        $q->where('status', $map[$key]);
+                    }
                 })
                 ->orderByDesc('date_requested')
                 ->orderByDesc('id')
@@ -68,7 +76,6 @@ class CashLoanController extends Controller
         ]);
     }
 
-    // Create form (blocked if user has ongoing/Active loan)
     public function create()
     {
         $user = Auth::user();
@@ -81,7 +88,6 @@ class CashLoanController extends Controller
         return view('cashloans.create');
     }
 
-    // Store new loan (uses browser date to avoid timezone drift)
     public function store(Request $request)
     {
         $auth = Auth::user();
@@ -107,7 +113,6 @@ class CashLoanController extends Controller
         return redirect()->route('cashloans.index')->with('create_success', 'Cash loan request filed.');
     }
 
-    // View single loan
     public function show(CashLoan $cashloan)
     {
         $user = Auth::user();
@@ -116,7 +121,6 @@ class CashLoanController extends Controller
         return view('cashloans.show', ['loan' => $cashloan]);
     }
 
-    // Edit form (only Pending, for owner or admin)
     public function edit(CashLoan $cashloan)
     {
         $user = Auth::user();
@@ -125,14 +129,13 @@ class CashLoanController extends Controller
         return view('cashloans.edit', ['loan' => $cashloan]);
     }
 
-    // Update (only Pending)
     public function update(Request $request, CashLoan $cashloan)
     {
         $user = Auth::user();
         abort_unless($this->isPending($cashloan) && (($user->is_admin ?? false) || $cashloan->user_id === $user->id), 403);
 
         $data = $request->validate([
-            'date_requested' => ['required','date'], // readonly in UI, kept for consistency
+            'date_requested' => ['required','date'],
             'amount'         => ['required','numeric','min:0.01'],
             'type'           => ['required','string','max:100'],
             'pay_periods'    => ['required','integer','min:1','max:6'],
@@ -144,7 +147,6 @@ class CashLoanController extends Controller
         return redirect()->route('cashloans.index')->with('update_success', 'Cash loan updated.');
     }
 
-    // Delete (only Pending)
     public function destroy(CashLoan $cashloan)
     {
         $user = Auth::user();
@@ -155,28 +157,55 @@ class CashLoanController extends Controller
         return redirect()->route('cashloans.index')->with('remove_success', 'Cash loan deleted.');
     }
 
-    // Admin status changes (disabled for Active/Fully Paid)
+    // Admin approval set Approved
     public function approve(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);
-        abort_if($this->isLocked($cashloan), 403, 'Cannot modify a paid or ongoing loan.');
+        abort_if($this->approvalLocked($cashloan), 403, 'Cannot approve: ongoing or paid.');
         $cashloan->update(['status' => 'Approved']);
-        return back()->with('admin_update_success', 'Cash loan set to Approved.');
+        return back()->with('admin_update_success', 'Loan approved.');
     }
 
+    // Admin rejection
     public function reject(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);
-        abort_if($this->isLocked($cashloan), 403, 'Cannot modify a paid or ongoing loan.');
+        abort_if($this->approvalLocked($cashloan), 403, 'Cannot reject: ongoing or paid.');
         $cashloan->update(['status' => 'Rejected']);
-        return back()->with('admin_update_success', 'Cash loan set to Rejected.');
+        return back()->with('admin_update_success', 'Loan rejected.');
     }
 
-    public function pending(CashLoan $cashloan)
+    // Mark Active
+    public function activate(CashLoan $cashloan)
     {
         abort_unless(Auth::user()?->is_admin, 403);
-        abort_if($this->isLocked($cashloan), 403, 'Cannot modify a paid or ongoing loan.');
-        $cashloan->update(['status' => 'Pending']);
-        return back()->with('admin_update_success', 'Cash loan set to Pending.');
+
+        if ($this->userHasOngoing($cashloan->user_id, $cashloan->id)) {
+            return back()->with('admin_update_error', 'User already has ongoing loan.');
+        }
+
+        if (!in_array($cashloan->status, ['Pending','Approved'], true)) {
+            return back()->with('admin_update_error', 'Only Pending or Approved can become Ongoing.');
+        }
+
+        $cashloan->update(['status' => 'Active']);
+        return back()->with('admin_update_success', 'Loan marked Ongoing.');
+    }
+
+    // Mark Fully Paid
+    public function paid(CashLoan $cashloan)
+    {
+        abort_unless(Auth::user()?->is_admin, 403);
+
+        if ($cashloan->status === 'Fully Paid') {
+            return back()->with('admin_update_success', 'Already Fully Paid.');
+        }
+
+        if (!in_array($cashloan->status, ['Active','Approved'], true)) {
+            return back()->with('admin_update_error', 'Only Active or Approved can be paid.');
+        }
+
+        $cashloan->update(['status' => 'Fully Paid']);
+        return back()->with('admin_update_success', 'Loan marked Fully Paid.');
     }
 }
