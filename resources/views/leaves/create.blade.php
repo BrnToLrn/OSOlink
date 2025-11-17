@@ -105,6 +105,14 @@
 
             function ensureStartDefaultToday() {
                 if (!start.value) start.value = ymd(new Date());
+                // autofill end to start + 1 day if end is empty
+                try {
+                    const s = new Date(start.value + 'T00:00:00');
+                    const defaultEnd = ymd(addDays(s, 1));
+                    if (!end.value) end.value = defaultEnd;
+                } catch(e) {
+                    // noop
+                }
             }
 
             function syncEndMin() {
@@ -112,7 +120,8 @@
                 const s = new Date(start.value + 'T00:00:00');
                 const minEnd = ymd(addDays(s, 1)); // strictly after start
                 end.min = minEnd;
-                if (end.value && end.value < minEnd) end.value = minEnd;
+                // if end is empty or earlier than minEnd, set it to minEnd
+                if (!end.value || end.value < minEnd) end.value = minEnd;
             }
 
             function scheduleMidnightRollover() {

@@ -99,4 +99,42 @@ class PayslipController extends Controller
         $payslip->delete();
         return redirect()->route('payslip.index')->with('remove_success', 'Payslip deleted.');
     }
+
+    public function store(Request $request)
+    {
+        $this->middleware('auth'); // controller already has middleware, kept for clarity
+
+        $data = $request->validate([
+            'user_id'    => ['required','integer','exists:users,id'],
+            'period_from'=> ['required','date'],
+            'period_to'  => ['required','date','after_or_equal:period_from'],
+            'issue_date' => ['required','date'],
+            'hours_worked' => ['required','numeric','min:0'],
+            'hourly_rate'  => ['required','numeric','min:0'],
+            'adjustments'  => ['nullable','numeric'],
+            'cash_loan_id'            => ['nullable','integer','exists:cash_loans,id'],
+            'cash_loan_period_number' => ['nullable','integer','min:1','max:255'],
+            'is_paid'      => ['sometimes','boolean'],
+        ]);
+
+        // ensure boolean
+        $data['is_paid'] = (bool)($data['is_paid'] ?? false);
+
+        // create model instance, set created_by explicitly
+        $payslip = new Payslip($data);
+        $payslip->created_by = auth()->id();
+
+        // if loan/period provided, set installment details on model
+        if (!empty($data['cash_loan_id']) && !empty($data['cash_loan_period_number'])) {
+            $loan = \App\Models\CashLoan::find($data['cash_loan_id']);
+            if ($loan) {
+                $payslip->setLoanInstallment($loan, (int)$data['cash_loan_period_number']);
+            }
+        }
+
+        // compute totals and save
+        $payslip->recomputeTotals()->save();
+
+        return redirect()->route('payslip.show', $payslip)->with('success', 'Payslip created.');
+    }
 }

@@ -8,6 +8,7 @@ use App\Models\LeaveStatusHistory;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class LeaveController extends Controller
 {
@@ -267,6 +268,26 @@ class LeaveController extends Controller
         return back()->with('global_update_success', $this->globalStatusMessage('Pending'));
     }
 
+    /**
+     * Reset used counter for all leave_counters to 0.
+     * Admin only — route is protected by middleware in routes/web.php.
+     */
+    public function resetCounters(Request $request)
+    {
+        try {
+            // Raw update to ensure every row is updated
+            DB::statement('UPDATE leave_counters SET used = 0');
+
+            // set a short-lived session flag so subsequent index rendering doesn't immediately recompute the counters
+            session(['leave_counters_reset' => true]);
+
+            return redirect()->back()->with('success', 'Leave counters reset to 0 for all employees.');
+        } catch (\Throwable $e) {
+            // log if you want: \Log::error($e);
+            return redirect()->back()->with('error', 'Failed to reset leave counters.');
+        }
+    }
+
     // ---------- AuthZ helpers ----------
 
     private function authorizeView(Leave $leave): void
@@ -324,6 +345,12 @@ class LeaveController extends Controller
 
     private function ensureAllCounters(int $userId, int $fiscalYear): void
     {
+        // If we just ran an admin reset, skip recomputing for this request to keep the DB values at 0.
+        if (session('leave_counters_reset')) {
+            session()->forget('leave_counters_reset');
+            return;
+        }
+
         foreach ($this->leaveTypes() as $type) {
             $this->ensureCounter($userId, $type, $fiscalYear);
         }

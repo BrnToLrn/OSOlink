@@ -173,12 +173,17 @@ Route::middleware('auth')->group(function () {
  * =======================
  */
 Route::middleware(['auth', 'admin'])->group(function () {
+    // Admin panel routes
     Route::get('/adminpanel/admin', [AdminController::class, 'index'])->name('adminpanel.admin');
     Route::post('/admin/users', [AdminController::class, 'store'])->name('admin.users.store');
     Route::patch('/admin/users/{user}/toggle', [AdminController::class, 'toggleStatus'])->name('admin.users.toggle');
     Route::get('/admin/logs', [AdminController::class, 'logs'])->name('admin.logs');
     Route::get('/admin/users/{user}', [AdminController::class, 'show'])->name('admin.users.show');
     Route::patch('/admin/users/{user}', [AdminController::class, 'update'])->name('admin.users.update');
+
+    // Reset leave_counters.used -> 0 (admin)
+    Route::post('/admin/leave-counters/reset', [\App\Http\Controllers\LeaveController::class, 'resetCounters'])
+        ->name('admin.leave_counters.reset');
 });
 
 require __DIR__.'/auth.php';
