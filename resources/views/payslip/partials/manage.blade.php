@@ -18,19 +18,41 @@
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Hours Worked</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Hourly Rate</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Adjustments</th>
+                    <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Cash Loan Deduction</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Net Pay</th>
                     <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Issued</th>
                 </tr>
             </thead>
             <tbody class="divide-gray-200 dark:bg-gray-900">
                 @forelse($payslips as $p)
+                    @php
+                        $cashLoan = $p->cash_loan_deduction
+                            ?? $p->cash_loan_deduction_for_period
+                            ?? $p->cash_loan_amount
+                            ?? 0;
+                    @endphp
                     <tr class="bg-white dark:bg-gray-900">
-                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $p->period_from->format('F j, Y') }} — {{ $p->period_to->format('F j, Y') }}</td>
-                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $p->hours_worked }}</td>
-                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">CA${{ number_format($p->hourly_rate, 2) }}</td>
-                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">CA${{ number_format($p->adjustments, 2) }}</td>
-                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">CA${{ number_format($p->net_pay, 2) }}</td>
-                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">{{ $p->issue_date->format('F j, Y') }}</td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            {{ $p->period_from->format('F j, Y') }} — {{ $p->period_to->format('F j, Y') }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            {{ number_format($p->hours_worked ?? 0, 2) }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            CA${{ number_format($p->hourly_rate ?? 0, 2) }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            CA${{ number_format($p->adjustments ?? 0, 2) }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            CA${{ number_format($cashLoan, 2) }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            CA${{ number_format($p->net_pay ?? 0, 2) }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                            {{ $p->issue_date->format('F j, Y') }}
+                        </td>
                     </tr>
                 @empty
                     <tr class="bg-white dark:bg-gray-900">
