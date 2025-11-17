@@ -277,20 +277,20 @@
 
         const modal = document.getElementById('payslipModal');
 
-        function calculatePayslip() {
-            const hourlyRate = parseFloat(hourlyRateInput.value) || 0;
-            const hoursWorked = parseFloat(hoursWorkedInput.value) || 0;
-            const adjustments = parseFloat(adjustmentsInput.value) || 0;
+    function calculatePayslip() {
+        const hourlyRate = parseFloat(hourlyRateInput.value) || 0;
+        const hoursWorked = parseFloat(hoursWorkedInput.value) || 0;
+        const adjustments = parseFloat(adjustmentsInput.value) || 0;
 
-            const grossPay = hourlyRate * hoursWorked;
-            const netPay = grossPay + adjustments;
+        const grossPay = hourlyRate * hoursWorked;
+        const netPay = grossPay + adjustments;
 
-            grossPayInput.value = grossPay.toFixed(2);
-            netPayInput.value = netPay.toFixed(2);
+        grossPayInput.value = grossPay.toFixed(2);
+        netPayInput.value = netPay.toFixed(2);
 
-            grossPayHidden.value = grossPay.toFixed(2);
-            netPayHidden.value = netPay.toFixed(2);
-        }
+        grossPayHidden.value = grossPay.toFixed(2);
+        netPayHidden.value = netPay.toFixed(2);
+    }
 
         async function fetchHoursAndGross() {
             const userId = userIdHidden.value;
@@ -298,8 +298,7 @@
             const periodTo = periodToHidden.value;
             if (!userId || !periodFrom || !periodTo) return;
 
-            const tokenMeta = document.querySelector('meta[name="csrf-token"]');
-            const csrf = tokenMeta ? tokenMeta.getAttribute('content') : null;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
             try {
                 const body = new URLSearchParams();
@@ -319,15 +318,16 @@
 
                 if (!resp.ok) return;
 
-                const data = await resp.json();
-                const hours = parseFloat(data.hours) || 0;
-                const gross = parseFloat(data.gross) || 0;
+            const data = await resp.json();
 
-                hoursWorkedInput.value = hours.toFixed(2);
-                hoursWorkedHidden.value = hours.toFixed(2);
+            const hours = parseFloat(data.hours) || 0;
+            const gross = parseFloat(data.gross) || 0;
 
-                grossPayInput.value = gross.toFixed(2);
-                grossPayHidden.value = gross.toFixed(2);
+            hoursWorkedInput.value = hours.toFixed(2);
+            hoursWorkedHidden.value = hours.toFixed(2);
+
+            grossPayInput.value = gross.toFixed(2);
+            grossPayHidden.value = gross.toFixed(2);
 
                 calculatePayslip();
             } catch {}
@@ -390,10 +390,10 @@
             calculatePayslip();
         });
 
-        hoursWorkedInput?.addEventListener('input', function () {
-            hoursWorkedHidden.value = hoursWorkedInput.value;
-            calculatePayslip();
-        });
+    hoursWorkedInput?.addEventListener('input', function () {
+        hoursWorkedHidden.value = hoursWorkedInput.value;
+        calculatePayslip();
+    });
 
         // Close button
         document.getElementById('payslipModalClose')?.addEventListener('click', () => {
