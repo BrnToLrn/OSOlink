@@ -260,6 +260,23 @@
         const closeCreateBtn = document.getElementById('closeCreatePayrollModal');
         const cancelCreateBtn = document.getElementById('cancelCreatePayrollModal');
 
+        // NEW: wire up the quick “Create Payroll” form (header select -> hidden inputs)
+        const quickForm = document.getElementById('createPayrollForm');
+        const periodSelect = document.getElementById('payrollPeriodSelect');
+        const periodFromInput = document.getElementById('period_from_input');
+        const periodToInput   = document.getElementById('period_to_input');
+
+        function syncPeriodHidden() {
+            if (!periodSelect || !periodFromInput || !periodToInput) return;
+            const [from, to] = (periodSelect.value || '').split('|');
+            periodFromInput.value = from || '';
+            periodToInput.value   = to || '';
+        }
+        periodSelect?.addEventListener('change', syncPeriodHidden);
+        quickForm?.addEventListener('submit', syncPeriodHidden);
+        // initialize on load so defaults are set
+        syncPeriodHidden();
+
         if (openBtn) {
             function showCreateModal() {
                 createModal.classList.remove('hidden');
@@ -339,7 +356,6 @@
                 }
 
                 payslipsBody.innerHTML = data.map(s => {
-                    // Prefer server-provided user_name, otherwise build from user fields (including middle_name), then email
                     const employee = s.user_name ?? ((s.user && (s.user.first_name || s.user.last_name)) ? [s.user.first_name, s.user.middle_name, s.user.last_name].filter(Boolean).join(' ') : (s.user?.email ?? '—'));
                     const bankName = s.user && s.user.bank_name ? s.user.bank_name : '';
                     const bankAccount = s.user && s.user.bank_account_number ? s.user.bank_account_number : '';
@@ -359,7 +375,13 @@
                     `;
                 }).join('');
 
-                // build a clean title: "Payslips (N) — January 1, 2000 — January 15, 
+                // FIXED: build a clean title: "Payslips (N) — January 1, 2000 — January 15, 2000"
+                let count = data.length;
+                let rangeLabel = '';
+                if (count > 0) {
+                    let minFrom = null;
+                    let maxTo = null;
+                    data.forEach(s => {
                         if (s.period_from) {
                             const d = new Date(s.period_from);
                             if (!minFrom || d < minFrom) minFrom = d;
@@ -391,7 +413,6 @@
         // Generate CSV: trigger server export for given payroll
         window.generatePayrollCSV = function (payrollId) {
             const url = `/admin/payrolls/${payrollId}/export`;
-            // create link and click so auth cookies are sent and browser downloads
             const a = document.createElement('a');
             a.href = url;
             a.style.display = 'none';
@@ -424,9 +445,8 @@
             return str;
         }
         function escapeHtml(unsafe) {
-            return String(unsafe ?? '').replace(/[&<>"'`=\/]/g, function (s) {
-                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'
-            });
+            const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'};
+            return String(unsafe ?? '').replace(/[&<>"'`=\/]/g, s => map[s]);
         }
         function num(n){ return (n==null || n==='')? '': Number(n).toFixed(2); }
         function money(n){ return (n==null || n==='')? '': Number(n).toFixed(2); }

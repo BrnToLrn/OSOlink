@@ -17,6 +17,7 @@ class Payroll extends Model
         'period_to',
         'total_amount',
         'status',
+        'created_by', // allow mass assignment
     ];
 
     protected $casts = [
@@ -24,9 +25,16 @@ class Payroll extends Model
         'period_to'   => 'date',
     ];
 
+    // Use the correct FK for creator
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // Optional explicit alias
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     // If you use payslips as fallback for period dates

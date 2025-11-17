@@ -80,13 +80,8 @@ class PayrollController extends Controller
                     'period_to'    => $validated['period_to'],
                     'total_amount' => $totalAmount,
                     'status'       => 'pending',
+                    'created_by'   => auth()->id(), // set creator at insert time
                 ]);
-
-                // record the creating user (set directly so no need to make it fillable)
-                if (auth()->check()) {
-                    $payroll->created_by = auth()->id();
-                    $payroll->save();
-                }
 
                 // 7. "Tag" all the found payslips with the new payroll's ID
                 //    We use pluck() to get just the IDs,
