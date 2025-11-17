@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Carbon\Carbon;
 
 class PayrollController extends Controller
 {
@@ -20,6 +21,21 @@ class PayrollController extends Controller
             'period_from' => 'required|date',
             'period_to'   => 'required|date|after_or_equal:period_from',
         ]);
+
+        // enforce "payroll period" semantics: same month/year and either 1..15 or 16..end-of-month
+        $from = Carbon::parse($validated['period_from']);
+        $to   = Carbon::parse($validated['period_to']);
+
+        if ($from->year !== $to->year || $from->month !== $to->month) {
+            return back()->with('error', 'Payroll period must be within the same month and year.');
+        }
+
+        $lastDay = $from->copy()->endOfMonth()->day;
+        $okFirstHalf  = ($from->day === 1 && $to->day === 15);
+        $okSecondHalf = ($from->day === 16 && $to->day === $lastDay);
+        if (!($okFirstHalf || $okSecondHalf)) {
+            return back()->with('error', 'Payroll period must be either 1–15 or 16–' . $lastDay . ' of the same month.');
+        }
 
         try {
             // 2. Start a Database Transaction
@@ -43,17 +59,34 @@ class PayrollController extends Controller
                 }
 
                 // 5. Calculate the total amount
-                //    *** I am assuming your 'payslips' table has
-                //    a 'net_pay' column. Change this as needed.
-                $totalAmount = $payslipsToBatch->sum('net_pay');
+                // include cash loan period deduction if present on the payslip
+                // (expects a numeric column like `cash_loan_period_deduction` on payslips;
+                //  fallback to 0 when absent)
+                $totalAmount = $payslipsToBatch->sum(function ($s) {
+                    $net = (float) ($s->net_pay ?? 0);
+                    $deduction = 0.0;
+                    if (isset($s->cash_loan_period_deduction)) {
+                        $deduction = (float) $s->cash_loan_period_deduction;
+                    } elseif (isset($s->cash_loan_deduction)) {
+                        // alternative column name fallback
+                        $deduction = (float) $s->cash_loan_deduction;
+                    }
+                    return $net - $deduction;
+                });
 
                 // 6. Create the main Payroll "group" record
                 $payroll = Payroll::create([
                     'period_from'  => $validated['period_from'],
                     'period_to'    => $validated['period_to'],
                     'total_amount' => $totalAmount,
-                    'status'       => 'Pending',
+                    'status'       => 'pending',
                 ]);
+
+                // record the creating user (set directly so no need to make it fillable)
+                if (auth()->check()) {
+                    $payroll->created_by = auth()->id();
+                    $payroll->save();
+                }
 
                 // 7. "Tag" all the found payslips with the new payroll's ID
                 //    We use pluck() to get just the IDs,
@@ -129,14 +162,29 @@ class PayrollController extends Controller
         $data = $request->validate([
             'status' => 'required|string|max:32',
         ]);
-        $payroll->status = $data['status'];
+        $newStatus = strtolower($data['status']);
+        $payroll->status = $newStatus;
         $payroll->save();
+
+        // If marked as paid, mark all linked payslips as paid.
+        if ($newStatus === 'paid') {
+            Payslip::where('payroll_id', $payroll->id)->update(['is_paid' => true]);
+        } elseif ($newStatus === 'pending') {
+            // optionally unmark as paid when moved back to pending
+            Payslip::where('payroll_id', $payroll->id)->update(['is_paid' => false]);
+        }
+
         return redirect()->back()->with('success', 'Payroll status updated.');
     }
 
-    // delete payroll (FK is nullOnDelete in migration; this will null payroll_id for payslips)
+    // delete payroll (prevent deleting paid payrolls)
     public function destroy(Payroll $payroll)
     {
+        // don't allow deletion of already-paid payrolls
+        if (strtolower($payroll->status ?? '') === 'paid') {
+            return redirect()->back()->with('error', 'Cannot delete a payroll marked as paid.');
+        }
+
         try {
             $payroll->delete();
             return redirect()->back()->with('success', 'Payroll deleted.');

@@ -22,13 +22,73 @@
                 </div>
             @endif
 
-            <button type="button" id="openCreatePayrollModal"
-               class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 border border-transparent 
-               rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 
-               dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                + Create Payroll
-            </button>
-        </div>
+            @php
+                $year = now()->year;
+                $options = [];
+                for ($m = 1; $m <= 12; $m++) {
+                    $firstDay = \Carbon\Carbon::create($year, $m, 1);
+                    $midDay = \Carbon\Carbon::create($year, $m, 15);
+                    $lastDay = $firstDay->copy()->endOfMonth();
+
+                    $firstHalfExists = \App\Models\Payslip::whereNull('payroll_id')
+                        ->whereBetween('issue_date', [$firstDay->toDateString(), $midDay->toDateString()])
+                        ->exists();
+
+                    $secondHalfExists = \App\Models\Payslip::whereNull('payroll_id')
+                        ->whereBetween('issue_date', [$firstDay->copy()->day(16)->toDateString(), $lastDay->toDateString()])
+                        ->exists();
+
+                    if ($firstHalfExists) {
+                        $options[] = [
+                            'from'  => $firstDay->toDateString(),
+                            'to'    => $midDay->toDateString(),
+                            'label' => $firstDay->format('F j, Y') . ' — ' . $midDay->format('F j, Y'),
+                        ];
+                    }
+                    if ($secondHalfExists) {
+                        $options[] = [
+                            'from'  => $firstDay->copy()->day(16)->toDateString(),
+                            'to'    => $lastDay->toDateString(),
+                            'label' => $firstDay->copy()->day(16)->format('F j, Y') . ' — ' . $lastDay->format('F j, Y'),
+                        ];
+                    }
+                }
+                $hasOptions = count($options) > 0;
+            @endphp
+
+            @if($hasOptions)
+                <form id="createPayrollForm" action="{{ route('admin.payrolls.batch') }}" method="POST" class="flex items-center gap-2">
+                    @csrf
+                    <label for="payrollPeriodSelect" class="sr-only">Payroll period</label>
+                    <select id="payrollPeriodSelect" class="rounded border px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                        @foreach($options as $opt)
+                            <option value="{{ $opt['from'] }}|{{ $opt['to'] }}">{{ $opt['label'] }}</option>
+                        @endforeach
+                    </select>
+
+                    <input type="hidden" name="period_from" id="period_from_input" value="">
+                    <input type="hidden" name="period_to"   id="period_to_input"   value="">
+
+                    <button type="submit"
+                        class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 border border-transparent 
+                               rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 
+                               dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                        id="createPayrollSubmit">
+                        + Create Payroll
+                    </button>
+                </form>
+            @else
+                <div class="flex items-center gap-3">
+                    <div aria-live="polite" class="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 dark:bg-gray-800 text-sm text-gray-600 dark:text-gray-400">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1 4v2m-7 0h14a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z"/></svg>
+                        <span>No unassigned payslips for {{ $year }}.</span>
+                    </div>
+                    <button type="button" disabled aria-disabled="true" class="px-4 py-2 rounded-md bg-indigo-600 text-white opacity-50 cursor-not-allowed text-xs">
+                        + Create Payroll
+                    </button>
+                </div>
+            @endif
+         </div>
     </header>
 
     <div id="createPayrollModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
@@ -73,6 +133,7 @@
                     <tr>
                         <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Period</th>
                         <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Total Amount</th>
+                        <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Created By</th>
                         <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Status</th>
                         <th class="px-4 py-2 text-center text-sm font-medium text-gray-700 dark:text-gray-200">Action</th>
                     </tr>
@@ -86,6 +147,15 @@
                             <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
                                 CA${{ number_format($p->total_amount ?? 0, 2) }}
                             </td>
+                            <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
+                                @if($p->user)
+                                    {{ trim($p->user->first_name . ' ' . ($p->user->middle_name ?? '') . ' ' . $p->user->last_name) }}
+                                @elseif(!empty($p->created_by))
+                                    User #{{ $p->created_by }}
+                                @else
+                                    &mdash;
+                                @endif
+                            </td>
                             @php $status = $p->status ?? 'pending'; @endphp
                             <td class="px-4 py-2 text-center text-sm {{ $status === 'paid' ? 'text-green-600 dark:text-green-400' : ($status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-gray-100') }}">
                                 {{ ucfirst($status) }}
@@ -93,11 +163,16 @@
                             <td class="px-4 py-2 text-sm">
                                 <div class="flex justify-center gap-2 items-center">
                                     <!-- Delete -->
-                                    <form action="{{ route('admin.payrolls.destroy', $p) }}" method="POST" onsubmit="return confirm('Delete payroll batch? This cannot be undone.');" class="inline-block">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-red-600 hover:underline text-sm" title="Delete">Delete</button>
-                                    </form>
+                                    @if(strtolower($p->status ?? '') !== 'paid')
+                                        <!-- Delete (only when not paid) -->
+                                        <form action="{{ route('admin.payrolls.destroy', $p) }}" method="POST" onsubmit="return confirm('Delete payroll batch? This cannot be undone.');" class="inline-block">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-600 hover:underline text-sm" title="Delete">Delete</button>
+                                        </form>
+                                    @else
+                                        <button type="button" class="text-gray-400 text-sm" title="Paid payroll cannot be deleted" disabled>Delete</button>
+                                    @endif
 
                                     <!-- View: open modal and show payslips for this payroll -->
                                     <button
@@ -128,7 +203,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">
+                            <td colspan="5" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">
                                 No payroll batches found.
                             </td>
                         </tr>
@@ -284,13 +359,7 @@
                     `;
                 }).join('');
 
-                // build a clean title: "Payslips (N) — January 1, 2000 — January 15, 2000"
-                const count = Array.isArray(data) ? data.length : 0;
-                let rangeLabel = '';
-                if (count) {
-                    let minFrom = null;
-                    let maxTo = null;
-                    data.forEach(s => {
+                // build a clean title: "Payslips (N) — January 1, 2000 — January 15, 
                         if (s.period_from) {
                             const d = new Date(s.period_from);
                             if (!minFrom || d < minFrom) minFrom = d;
@@ -356,7 +425,7 @@
         }
         function escapeHtml(unsafe) {
             return String(unsafe ?? '').replace(/[&<>"'`=\/]/g, function (s) {
-                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'})[s];
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'
             });
         }
         function num(n){ return (n==null || n==='')? '': Number(n).toFixed(2); }
