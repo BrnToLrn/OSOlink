@@ -5,7 +5,7 @@
                 Manage Global Cash Loans
             </h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Approve, reject, mark ongoing, or mark paid cash loans.
+                Approve or reject cash loans.
             </p>
         </div>
     </header>
@@ -59,69 +59,66 @@
                     @php
                         $status = (string)($loan->status ?? 'Pending');
                         $s = strtolower($status);
+
                         $statusClass = $s === 'approved' ? 'text-green-600 dark:text-green-400'
                                      : ($s === 'rejected' ? 'text-red-600 dark:text-red-400'
                                      : ($s === 'active' ? 'text-blue-600 dark:text-blue-400'
                                      : ($s === 'fully paid' ? 'text-emerald-600 dark:text-emerald-400'
                                      : 'text-yellow-600 dark:text-yellow-400')));
-                        $lockedApproval = in_array($status, ['Active','Fully Paid'], true);
-                        $canMarkActive  = in_array($status, ['Pending','Approved'], true);
-                        $canMarkPaid    = in_array($status, ['Active','Approved'], true);
+
+                        // TRUE = cannot approve/reject
+                        $lockedApproval = in_array($status, ['Approved', 'Active', 'Fully Paid'], true);
                     @endphp
+
                     <tr>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             {{ $loan->user->first_name }} {{ $loan->user->middle_name }} {{ $loan->user->last_name }}
                         </td>
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">{{ $loan->type }}</td>
+
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             {{ $loan->date_requested ? \Carbon\Carbon::parse($loan->date_requested)->format('F j, Y') : 'N/A' }}
                         </td>
+
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             CA$ {{ number_format((float)($loan->amount ?? 0), 2) }}
                         </td>
+
                         <td class="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                             {{ (int)$loan->pay_periods }} {{ (int)$loan->pay_periods === 1 ? 'period' : 'periods' }}
                         </td>
+
                         <td class="px-4 py-2 text-center">
                             <span class="{{ $statusClass }}">{{ $status }}</span>
                         </td>
+
                         <td class="px-4 py-2 text-center">
                             <div class="inline-flex items-center justify-center gap-3">
                                 <a href="{{ route('cashloans.show', $loan) }}" class="text-blue-600 dark:text-blue-400 hover:underline">View</a>
 
-                                @if(!$lockedApproval)
-                                    <form action="{{ route('cashloans.approve', $loan) }}" method="POST" class="m-0">
-                                        @csrf
-                                        <button type="submit" class="text-green-600 dark:text-green-400 hover:underline">Approve</button>
-                                    </form>
-                                    <form action="{{ route('cashloans.reject', $loan) }}" method="POST" class="m-0">
-                                        @csrf
-                                        <button type="submit" class="text-red-600 hover:underline">Reject</button>
-                                    </form>
-                                @else
-                                    <span class="text-gray-400 dark:text-gray-500 select-none">Approval disabled</span>
-                                @endif
-
-                                <form action="{{ route('cashloans.activate', $loan) }}" method="POST" class="m-0">
+                                {{-- Approve --}}
+                                <form action="{{ route('cashloans.approve', $loan) }}" method="POST" class="m-0">
                                     @csrf
                                     <button type="submit"
-                                            class="text-blue-600 dark:text-blue-400 hover:underline {{ $canMarkActive ? '' : 'opacity-40 cursor-not-allowed pointer-events-none' }}"
-                                            {{ $canMarkActive ? '' : 'disabled' }}>
-                                        Mark Ongoing
+                                        class="hover:underline {{ $lockedApproval ? 'text-green-600/40 dark:text-green-400/40 cursor-not-allowed pointer-events-none' : 'text-green-600 dark:text-green-400' }}"
+                                        {{ $lockedApproval ? 'disabled' : '' }}>
+                                        Approve
                                     </button>
                                 </form>
 
-                                <form action="{{ route('cashloans.paid', $loan) }}" method="POST" class="m-0">
+                                {{-- Reject --}}
+                                <form action="{{ route('cashloans.reject', $loan) }}" method="POST" class="m-0">
                                     @csrf
                                     <button type="submit"
-                                            class="text-emerald-600 dark:text-emerald-400 hover:underline {{ $canMarkPaid ? '' : 'opacity-40 cursor-not-allowed pointer-events-none' }}"
-                                            {{ $canMarkPaid ? '' : 'disabled' }}>
-                                        Mark Paid
+                                        class="hover:underline {{ $lockedApproval ? 'text-red-600/40 dark:text-red-400/40 cursor-not-allowed pointer-events-none' : 'text-red-600 dark:text-red-400' }}"
+                                        {{ $lockedApproval ? 'disabled' : '' }}>
+                                        Reject
                                     </button>
                                 </form>
                             </div>
                         </td>
                     </tr>
+
                 @empty
                     <tr>
                         <td colspan="7" class="px-6 py-6 text-center text-base text-gray-500 dark:text-gray-400">

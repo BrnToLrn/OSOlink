@@ -63,7 +63,6 @@
             </thead>
             <tbody id="ps_rows" class="divide-gray-200 dark:bg-gray-900">
                 @php
-                    // Resolve selected period from dropdown (value is "YYYY-MM-DD|YYYY-MM-DD")
                     $selected = request('ps_period') ?? null;
                     if ($selected && str_contains($selected, '|')) {
                         [$selStart, $selEnd] = explode('|', $selected, 2);
@@ -73,7 +72,6 @@
                         $selStart = $defaultHalf === 1 ? "{$yearNow}-{$mm}-01" : "{$yearNow}-{$mm}-16";
                         $selEnd = $defaultHalf === 1 ? "{$yearNow}-{$mm}-15" : "{$yearNow}-{$mm}-" . sprintf('%02d', $endDay);
                     }
-
                     $rows = $periodEmployees ?? collect();
                 @endphp
 
@@ -81,21 +79,17 @@
                     @php
                         $user = is_array($row) ? ($row['user'] ?? null) : ($row->user ?? $row);
                         $hours = is_array($row) ? ($row['hours'] ?? 0) : ($row->hours ?? 0);
-
-                        // Build "First [Middle] Last"
                         $parts = [
                             trim(optional($user)->first_name ?? ''),
                             trim(optional($user)->middle_name ?? ''),
                             trim(optional($user)->last_name ?? ''),
                         ];
                         $fullName = trim(implode(' ', array_filter($parts)));
-
                         $jobType = $user->job_type ?? '—';
                         $hourlyRate = isset($user->hourly_rate) ? number_format((float)$user->hourly_rate, 2) : '0.00';
                     @endphp
                     <tr class="ps-row"
                         data-period-from="{{ $selStart }}"
-
                         data-period-to="{{ $selEnd }}">
                         <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">
                             {{ $fullName ?: ($user->name ?? 'Unknown') }}
@@ -251,6 +245,8 @@
                 <input type="hidden" name="period_from" id="period_from" value="">
                 <input type="hidden" name="period_to" id="period_to" value="">
                 <input type="hidden" name="issue_date" id="issue_date" value="{{ now()->toDateString() }}">
+                <!-- NEW: submit the computed cash loan deduction -->
+                <input type="hidden" name="cash_loan_deduction" id="cash_loan_deduction_hidden" value="0.00">
             </form>
         </div>
     </div>
@@ -262,7 +258,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var modal = document.getElementById('payslipModal');
     if (!modal) return;
 
-    // Scope queries to this modal to avoid ID collisions
     var modalBackdrop = modal.querySelector('#payslipModalBackdrop');
     var modalClose = modal.querySelector('#payslipModalClose');
 
@@ -286,14 +281,16 @@ document.addEventListener('DOMContentLoaded', function () {
     var grossPayHidden    = modal.querySelector('#gross_pay_hidden');
     var adjustmentsHidden = modal.querySelector('#adjustments_hidden');
     var netPayHidden      = modal.querySelector('#net_pay_hidden');
+    var cashLoanHidden    = modal.querySelector('#cash_loan_deduction_hidden');
 
     function calculatePayslip() {
         var rate = parseFloat(hourlyRateInput.value) || 0;
         var hours = parseFloat(hoursWorkedInput.value) || 0;
         var adj = parseFloat(adjustmentsInput.value) || 0;
+        var loan = parseFloat(cashLoanHidden.value) || 0;
 
         var gross = rate * hours;
-        var net = gross + adj;
+        var net = gross - loan + adj;
 
         grossPayInput.value  = gross.toFixed(2);
         netPayInput.value    = net.toFixed(2);
@@ -342,6 +339,38 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch {}
     }
 
+    async function fetchCashLoanDeduction() {
+        var userId = userIdHidden.value;
+        if (!userId) return;
+
+        var csrfEl = document.querySelector('meta[name="csrf-token"]');
+        var csrf = csrfEl ? csrfEl.getAttribute('content') : null;
+
+        try {
+            var body = new URLSearchParams();
+            body.append('user_id', userId);
+
+            var resp = await fetch('{{ route('payslip.calcCashLoan') }}', {
+                method: 'POST',
+                headers: Object.assign({
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'Accept': 'application/json'
+                }, csrf ? {'X-CSRF-TOKEN': csrf} : {}),
+                body: body.toString()
+            });
+
+            if (!resp.ok) return;
+
+            var data = await resp.json();
+            var loan = parseFloat(data.deduction || 0) || 0;
+
+            cashLoanInput.value  = loan.toFixed(2);
+            cashLoanHidden.value = loan.toFixed(2);
+
+            calculatePayslip();
+        } catch {}
+    }
+
     // Delegated click for Create buttons
     if (psRows) {
         psRows.addEventListener('click', function (e) {
@@ -374,6 +403,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Defaults
             if (!cashLoanInput.value || cashLoanInput.value.trim() === '') cashLoanInput.value = '0.00';
+            cashLoanHidden.value = cashLoanInput.value;
+
             var adjVal = adjustmentsInput.value && adjustmentsInput.value.trim() !== ''
                 ? (parseFloat(adjustmentsInput.value) || 0).toFixed(2)
                 : '0.00';
@@ -382,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             calculatePayslip();
             fetchHoursAndGross();
+            fetchCashLoanDeduction();
 
             modal.classList.remove('hidden');
         });

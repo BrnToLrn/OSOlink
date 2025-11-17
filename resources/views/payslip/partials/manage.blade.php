@@ -1,3 +1,23 @@
+@php
+    // Determine the current user's id from payslips or auth.
+    $userId = ($payslips ?? collect())->pluck('user_id')->first() ?? auth()->id();
+
+    // Compute per-period deduction in PHP (DB-agnostic).
+    $perPeriodDeduction = 0.00;
+    if ($userId) {
+        $loans = \App\Models\CashLoan::where('user_id', $userId)
+            ->whereIn('status', ['Approved', 'Active'])
+            ->get(['amount', 'pay_periods']);
+
+        $perPeriodDeduction = $loans->sum(function ($loan) {
+            $amount  = (float) ($loan->amount ?? 0);
+            $periods = (int) ($loan->pay_periods ?? 1);
+            if ($periods <= 0) $periods = 1;
+            return $amount / $periods;
+        });
+    }
+@endphp
+
 <section>
     <header class="flex items-center justify-between">
         <div>
@@ -25,10 +45,8 @@
             <tbody class="divide-gray-200 dark:bg-gray-900">
                 @forelse($payslips as $p)
                     @php
-                        $cashLoan = $p->cash_loan_deduction
-                            ?? $p->cash_loan_deduction_for_period
-                            ?? $p->cash_loan_amount
-                            ?? 0;
+                        // Always show per-period deduction for the user
+                        $cashLoan = $perPeriodDeduction;
                     @endphp
                     <tr class="bg-white dark:bg-gray-900">
                         <td class="px-4 py-2 text-center text-sm text-gray-900 dark:text-gray-100">

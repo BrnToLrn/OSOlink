@@ -13,46 +13,61 @@
                 </header>
 
                 <div class="mt-6 space-y-6">
-                    <div class="flex items-center gap-4 mt-4">
-                        <!-- Date Requested -->
+                    <!-- Row 1: Date Requested | Amount -->
+                    <div class="flex items-center gap-4">
                         <div class="flex-1">
                             <x-input-label for="date_requested" :value="__('Date Requested')" />
                             <x-text-input
                                 id="date_requested"
                                 type="text"
                                 class="mt-1 block w-full cursor-not-allowed opacity-75"
-                                value="{{ old('date_requested', $loan?->date_requested ? \Carbon\Carbon::parse($loan->date_requested)->format('F j, Y') : '') }}"
+                                value="{{ old('date_requested', $loan?->date_requested ? \Carbon\Carbon::parse($loan->date_requested)->format('m/d/Y') : '') }}"
                                 disabled
                             />
                         </div>
 
-                        <!-- Amount -->
                         <div class="flex-1">
                             <x-input-label for="amount" :value="__('Amount')" />
+                            <div class="relative mt-1">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm text-gray-600 dark:text-gray-300 pointer-events-none">CA$</span>
+                                <x-text-input
+                                    id="amount"
+                                    type="text"
+                                    class="block w-full pl-14 cursor-not-allowed opacity-75"
+                                    value="{{ old('amount', isset($loan?->amount) ? number_format((float)$loan->amount, 2) : '') }}"
+                                    disabled
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Pay Periods | Purpose / Remarks -->
+                    <div class="flex items-center gap-4">
+                        <div class="flex-1">
+                            <x-input-label for="pay_periods" :value="__('Pay Periods')" />
                             <x-text-input
-                                id="amount"
+                                id="pay_periods"
                                 type="text"
                                 class="mt-1 block w-full cursor-not-allowed opacity-75"
-                                value="{{ old('amount', isset($loan?->amount) ? number_format((float)$loan->amount, 2) : '') }}"
+                                value="{{ old('pay_periods', isset($loan?->pay_periods) ? ($loan->pay_periods . ' ' . \Illuminate\Support\Str::plural('period', (int)$loan->pay_periods)) : '') }}"
+                                disabled
+                            />
+                        </div>
+
+                        <div class="flex-1">
+                            <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
+                            <x-text-input
+                                id="remarks"
+                                type="text"
+                                class="mt-1 block w-full cursor-not-allowed opacity-75"
+                                value="{{ old('remarks', $loan->remarks ?? '') }}"
                                 disabled
                             />
                         </div>
                     </div>
 
-                    <!-- Remarks -->
-                    <div>
-                        <x-input-label for="remarks" :value="__('Purpose / Remarks')" />
-                        <x-text-input
-                            id="remarks"
-                            type="text"
-                            class="mt-1 block w-full cursor-not-allowed opacity-75"
-                            value="{{ old('remarks', $loan->remarks ?? '') }}"
-                            disabled
-                        />
-                    </div>
-
-                    <div class="flex items-center gap-4 mt-4">
-                        <!-- Type -->
+                    <!-- Row 3: Type of Loan | Status -->
+                    <div class="flex items-center gap-4">
                         <div class="flex-1">
                             <x-input-label for="type" :value="__('Type of Loan')" />
                             <x-text-input
@@ -64,7 +79,6 @@
                             />
                         </div>
 
-                        <!-- Status -->
                         <div class="flex-1">
                             <x-input-label for="status" :value="__('Status')" />
                             <x-text-input

@@ -70,6 +70,28 @@ class PayslipController extends Controller
             ->with(compact('monthNow', 'yearNow', 'defaultHalf'));
     }
 
+    public function calcCashLoan(Request $request)
+    {
+        $data = $request->validate([
+            'user_id' => ['required','integer','exists:users,id'],
+        ]);
+
+        $loans = CashLoan::where('user_id', $data['user_id'])
+            ->whereIn('status', ['Approved','Active'])
+            ->get(['amount','pay_periods']);
+
+        $deduction = 0.0;
+        foreach ($loans as $loan) {
+            $amount = (float) ($loan->amount ?? 0);
+            $periods = max(1, (int) ($loan->pay_periods ?? 1));
+            $deduction += ($amount / $periods);
+        }
+
+        return response()->json([
+            'deduction' => number_format($deduction, 2, '.', ''), // string "133.33"
+        ]);
+    }
+    
     public function show(Payslip $payslip)
     {
         $user = Auth::user();

@@ -120,6 +120,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/payslip/manage', [PayslipController::class, 'manage'])->name('payslip.manage');
         Route::post('/payslip', [PayslipController::class, 'store'])->name('payslip.store');
         Route::post('/payslip/calc-hours', [PayslipController::class, 'calculateHours'])->name('payslip.calculateHours');
+        Route::post('/payslip/calc-cashloan', [PayslipController::class, 'calcCashLoan'])->name('payslip.calcCashLoan');
     });
 
     //Payroll
