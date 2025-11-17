@@ -114,10 +114,13 @@
                                 type="button"
                                 class="text-indigo-600 dark:text-indigo-400 hover:underline"
                                 data-user-id="{{ $user->id ?? '' }}"
-
                                 data-start="{{ $selStart }}"
-
-                                data-end="{{ $selEnd }}">
+                                data-end="{{ $selEnd }}"
+                                data-user-name="{{ $fullName ?: ($user->name ?? 'Unknown') }}"
+                                data-job-type="{{ $jobType }}"
+                                data-hourly-rate="{{ $hourlyRate }}"
+                                data-hours="{{ number_format((float)$hours, 2, '.', '') }}"
+                            >
                                 Create
                             </button>
                         </td>
@@ -141,8 +144,8 @@
 </section>
 
 <div id="payslipModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4" aria-labelledby="payslipModalTitle" role="dialog" aria-modal="true">
-    <div class="absolute inset-0 bg-black/50"></div>
-    <div class="relative w-full max-w-3xl px-4">
+    <div class="absolute inset-0 bg-black/50" id="payslipModalBackdrop" aria-hidden="true"></div>
+    <div class="relative z-10 w-full max-w-3xl px-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
             <header class="flex items-center justify-between">
                 <div>
@@ -247,164 +250,159 @@
                 <input type="hidden" name="user_id" id="user_id" value="">
                 <input type="hidden" name="period_from" id="period_from" value="">
                 <input type="hidden" name="period_to" id="period_to" value="">
+                <input type="hidden" name="issue_date" id="issue_date" value="{{ now()->toDateString() }}">
             </form>
         </div>
     </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Existing "Add Payslip" logic
-        const userIdHidden = document.getElementById('user_id');
-        const periodFromHidden = document.getElementById('period_from');
-        const periodToHidden = document.getElementById('period_to');
+document.addEventListener('DOMContentLoaded', function () {
+    var psRows = document.getElementById('ps_rows');
+    var modal = document.getElementById('payslipModal');
+    if (!modal) return;
 
-        const employeeNameInput = document.getElementById('employee_name');
-        const jobTypeInput = document.getElementById('job_type_display');
-        const hourlyRateInput = document.getElementById('hourly_rate');
-        const hoursWorkedInput = document.getElementById('hours_worked');
-        const grossPayInput = document.getElementById('gross_pay');
-        const adjustmentsInput = document.getElementById('adjustments');
-        const netPayInput = document.getElementById('net_pay');
-        const cashLoanInput = document.getElementById('cash_loan_deduction');
+    // Scope queries to this modal to avoid ID collisions
+    var modalBackdrop = modal.querySelector('#payslipModalBackdrop');
+    var modalClose = modal.querySelector('#payslipModalClose');
 
-        const jobTypeHidden = document.getElementById('job_type_hidden');
-        const hourlyRateHidden = document.getElementById('hourly_rate_hidden');
-        const hoursWorkedHidden = document.getElementById('hours_worked_hidden');
-        const grossPayHidden = document.getElementById('gross_pay_hidden');
-        const adjustmentsHidden = document.getElementById('adjustments_hidden');
-        const netPayHidden = document.getElementById('net_pay_hidden');
+    // Visible inputs (scoped)
+    var employeeNameInput = modal.querySelector('#employee_name');
+    var jobTypeInput      = modal.querySelector('#job_type_display');
+    var hourlyRateInput   = modal.querySelector('#hourly_rate');
+    var hoursWorkedInput  = modal.querySelector('#hours_worked');
+    var grossPayInput     = modal.querySelector('#gross_pay');
+    var adjustmentsInput  = modal.querySelector('#adjustments');
+    var netPayInput       = modal.querySelector('#net_pay');
+    var cashLoanInput     = modal.querySelector('#cash_loan_deduction');
 
-        const modal = document.getElementById('payslipModal');
+    // Hidden payload (scoped)
+    var userIdHidden      = modal.querySelector('#user_id');
+    var periodFromHidden  = modal.querySelector('#period_from');
+    var periodToHidden    = modal.querySelector('#period_to');
+    var jobTypeHidden     = modal.querySelector('#job_type_hidden');
+    var hourlyRateHidden  = modal.querySelector('#hourly_rate_hidden');
+    var hoursWorkedHidden = modal.querySelector('#hours_worked_hidden');
+    var grossPayHidden    = modal.querySelector('#gross_pay_hidden');
+    var adjustmentsHidden = modal.querySelector('#adjustments_hidden');
+    var netPayHidden      = modal.querySelector('#net_pay_hidden');
 
     function calculatePayslip() {
-        const hourlyRate = parseFloat(hourlyRateInput.value) || 0;
-        const hoursWorked = parseFloat(hoursWorkedInput.value) || 0;
-        const adjustments = parseFloat(adjustmentsInput.value) || 0;
+        var rate = parseFloat(hourlyRateInput.value) || 0;
+        var hours = parseFloat(hoursWorkedInput.value) || 0;
+        var adj = parseFloat(adjustmentsInput.value) || 0;
 
-        const grossPay = hourlyRate * hoursWorked;
-        const netPay = grossPay + adjustments;
+        var gross = rate * hours;
+        var net = gross + adj;
 
-        grossPayInput.value = grossPay.toFixed(2);
-        netPayInput.value = netPay.toFixed(2);
-
-        grossPayHidden.value = grossPay.toFixed(2);
-        netPayHidden.value = netPay.toFixed(2);
+        grossPayInput.value  = gross.toFixed(2);
+        netPayInput.value    = net.toFixed(2);
+        grossPayHidden.value = gross.toFixed(2);
+        netPayHidden.value   = net.toFixed(2);
+        hoursWorkedHidden.value = hours.toFixed(2);
+        hourlyRateHidden.value  = rate.toFixed(2);
     }
 
-        async function fetchHoursAndGross() {
-            const userId = userIdHidden.value;
-            const periodFrom = periodFromHidden.value;
-            const periodTo = periodToHidden.value;
-            if (!userId || !periodFrom || !periodTo) return;
+    async function fetchHoursAndGross() {
+        var userId = userIdHidden.value;
+        var periodFrom = periodFromHidden.value;
+        var periodTo = periodToHidden.value;
+        if (!userId || !periodFrom || !periodTo) return;
 
-        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        var csrfEl = document.querySelector('meta[name="csrf-token"]');
+        var csrf = csrfEl ? csrfEl.getAttribute('content') : null;
 
-            try {
-                const body = new URLSearchParams();
-                body.append('user_id', userId);
-                body.append('period_from', periodFrom);
-                body.append('period_to', periodTo);
+        try {
+            var body = new URLSearchParams();
+            body.append('user_id', userId);
+            body.append('period_from', periodFrom);
+            body.append('period_to', periodTo);
 
-                const resp = await fetch('/payslip/calc-hours', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        ...(csrf ? {'X-CSRF-TOKEN': csrf} : {}),
-                        'Accept': 'application/json'
-                    },
-                    body: body.toString()
-                });
-
-                if (!resp.ok) return;
-
-            const data = await resp.json();
-
-            const hours = parseFloat(data.hours) || 0;
-            const gross = parseFloat(data.gross) || 0;
-
-            hoursWorkedInput.value = hours.toFixed(2);
-            hoursWorkedHidden.value = hours.toFixed(2);
-
-            grossPayInput.value = gross.toFixed(2);
-            grossPayHidden.value = gross.toFixed(2);
-
-                calculatePayslip();
-            } catch {}
-        }
-
-        // Populate modal when pressing "Create"
-        document.querySelectorAll('#ps_rows button[data-user-id]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tr = btn.closest('tr');
-                const userId = btn.getAttribute('data-user-id') || '';
-                const start = btn.getAttribute('data-start') || '';
-                const end = btn.getAttribute('data-end') || '';
-
-                const tds = tr?.querySelectorAll('td') || [];
-                const employeeName = (tds[0]?.textContent || '').trim();
-                const jobType = (tds[1]?.textContent || '').trim();
-                const rateText = (tds[2]?.textContent || '').replace(/[^\d.-]/g, '');
-                const hoursText = (tds[3]?.textContent || '').replace(/[^\d.-]/g, '');
-
-                const rate = parseFloat(rateText) || 0;
-                const hours = parseFloat(hoursText) || 0;
-
-                // IDs and period
-                userIdHidden.value = userId;
-                periodFromHidden.value = start;
-                periodToHidden.value = end;
-
-                // Visible fields
-                employeeNameInput.value = employeeName;   // fix: correct employee name
-                jobTypeInput.value = jobType;
-                hourlyRateInput.value = rate.toFixed(2);
-                hoursWorkedInput.value = hours.toFixed(2);
-
-                // Hidden mirrors
-                jobTypeHidden.value = jobType;
-                hourlyRateHidden.value = rate.toFixed(2);
-                hoursWorkedHidden.value = hours.toFixed(2);
-
-                // Ensure adjustments populated
-                const adj = adjustmentsInput.value?.trim();
-                const adjValue = adj === '' ? '0.00' : (parseFloat(adj) || 0).toFixed(2);
-                adjustmentsInput.value = adjValue;
-                adjustmentsHidden.value = adjValue;
-
-                // Ensure cash loan deduction shows 0 when missing
-                if (!cashLoanInput.value || cashLoanInput.value.trim() === '') {
-                    cashLoanInput.value = '0';
-                }
-
-                calculatePayslip();
-                fetchHoursAndGross();
-
-                modal?.classList.remove('hidden');
+            var resp = await fetch('/payslip/calc-hours', {
+                method: 'POST',
+                headers: Object.assign({
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'Accept': 'application/json'
+                }, csrf ? {'X-CSRF-TOKEN': csrf} : {}),
+                body: body.toString()
             });
-        });
 
-        // Keep existing listeners
-        adjustmentsInput?.addEventListener('input', function () {
+            if (!resp.ok) return;
+
+            var data = await resp.json();
+            var hours = parseFloat(data.hours) || 0;
+            var gross = parseFloat(data.gross) || 0;
+
+            hoursWorkedInput.value  = hours.toFixed(2);
+            hoursWorkedHidden.value = hours.toFixed(2);
+            grossPayInput.value     = gross.toFixed(2);
+            grossPayHidden.value    = gross.toFixed(2);
+
+            calculatePayslip();
+        } catch {}
+    }
+
+    // Delegated click for Create buttons
+    if (psRows) {
+        psRows.addEventListener('click', function (e) {
+            var btn = e.target.closest('button[data-user-id]');
+            if (!btn) return;
+
+            var userId      = btn.dataset.userId || '';
+            var start       = btn.dataset.start || '';
+            var end         = btn.dataset.end || '';
+            var employee    = btn.dataset.userName || '';
+            var jobType     = btn.dataset.jobType || '';
+            var rate        = parseFloat((btn.dataset.hourlyRate || '0').replace(/,/g, '')) || 0;
+            var hours       = parseFloat((btn.dataset.hours || '0').replace(/,/g, '')) || 0;
+
+            // Fill hidden identifiers
+            userIdHidden.value     = userId;
+            periodFromHidden.value = start;
+            periodToHidden.value   = end;
+
+            // Fill visible fields
+            employeeNameInput.value = employee;
+            jobTypeInput.value      = jobType;
+            hourlyRateInput.value   = rate.toFixed(2);
+            hoursWorkedInput.value  = hours.toFixed(2);
+
+            // Mirrors
+            jobTypeHidden.value      = jobType;
+            hourlyRateHidden.value   = rate.toFixed(2);
+            hoursWorkedHidden.value  = hours.toFixed(2);
+
+            // Defaults
+            if (!cashLoanInput.value || cashLoanInput.value.trim() === '') cashLoanInput.value = '0.00';
+            var adjVal = adjustmentsInput.value && adjustmentsInput.value.trim() !== ''
+                ? (parseFloat(adjustmentsInput.value) || 0).toFixed(2)
+                : '0.00';
+            adjustmentsInput.value  = adjVal;
+            adjustmentsHidden.value = adjVal;
+
+            calculatePayslip();
+            fetchHoursAndGross();
+
+            modal.classList.remove('hidden');
+        });
+    }
+
+    // Live updates
+    if (adjustmentsInput) {
+        adjustmentsInput.addEventListener('input', function () {
             adjustmentsHidden.value = adjustmentsInput.value;
             calculatePayslip();
         });
-
-    hoursWorkedInput?.addEventListener('input', function () {
-        hoursWorkedHidden.value = hoursWorkedInput.value;
-        calculatePayslip();
-    });
-
-        // Close button
-        document.getElementById('payslipModalClose')?.addEventListener('click', () => {
-            modal?.classList.add('hidden');
+    }
+    if (hoursWorkedInput) {
+        hoursWorkedInput.addEventListener('input', function () {
+            hoursWorkedHidden.value = hoursWorkedInput.value;
+            calculatePayslip();
         });
+    }
 
-        // Optional: close when clicking backdrop
-        modal?.querySelector('.absolute.inset-0')?.addEventListener('click', () => {
-            modal?.classList.add('hidden');
-        });
-
-        // The old ps_month/ps_year/ps_half logic can remain; it’s guarded by null checks.
-    });
+    // Close handlers (scoped)
+    if (modalClose)  modalClose.addEventListener('click', function () { modal.classList.add('hidden'); });
+    if (modalBackdrop) modalBackdrop.addEventListener('click', function () { modal.classList.add('hidden'); });
+});
 </script>

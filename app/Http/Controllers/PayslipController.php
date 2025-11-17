@@ -116,7 +116,7 @@ class PayslipController extends Controller
 
         $payslip->recomputeTotals()->save();
 
-        return redirect()->route('payslip.show', $payslip)->with('update_success', 'Payslip updated.');
+        return redirect()->route('payslip.index', $payslip)->with('update_success', 'Payslip updated.');
     }
 
     public function destroy(Payslip $payslip)
