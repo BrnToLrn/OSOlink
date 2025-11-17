@@ -4,12 +4,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration 
+{
     public function up(): void
     {
         Schema::create('payslips', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
             $table->foreignId('payroll_id')->nullable()->constrained()->nullOnDelete();
 
             $table->date('period_from');
@@ -23,10 +25,7 @@ return new class extends Migration {
             $table->decimal('adjustments', 10, 2)->default(0);
 
             // Cash loan installment info (optional if user has a loan)
-            $table->foreignId('cash_loan_id')
-                ->nullable()
-                ->constrained('cash_loans')
-                ->nullOnDelete();
+            $table->foreignId('cash_loan_id')->nullable()->constrained('cash_loans')->nullOnDelete();
 
             // Which period of the loan this payslip represents (1..pay_periods)
             $table->unsignedTinyInteger('cash_loan_period_number')->nullable();

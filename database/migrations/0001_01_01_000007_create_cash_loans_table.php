@@ -11,20 +11,14 @@ return new class extends Migration
     {
         Schema::create('cash_loans', function (Blueprint $table) {
             $table->id();
-
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-
-            // Core fields
             $table->date('date_requested')->default(DB::raw('CURRENT_DATE'));
             $table->decimal('amount', 10, 2);
-            $table->unsignedTinyInteger('pay_periods')->default(1); // 1..6 periods
+            $table->unsignedTinyInteger('pay_periods')->default(1);
             $table->string('type', 100);
-            $table->string('status', 50)->default('Pending'); // Pending, Approved, Rejected, Active, Fully Paid, Cancelled
+            $table->string('status', 50)->default('Pending');
             $table->text('remarks')->nullable();
-
             $table->timestamps();
-
-            // Indexes
             $table->index(['user_id', 'status']);
             $table->index('date_requested');
             $table->index('pay_periods');

@@ -8,9 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        /**
-         * Projects Table
-         */
         Schema::create('projects', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -23,32 +20,28 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        /**
-         * Pivot Table: project_user
-         */
         Schema::create('project_user', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->enum('project_role', ['Developer', 'Project Lead'])->default('Developer')->after('user_id');
             $table->timestamps();
         });
 
-        /**
-         * Time Logs Table
-         */
         Schema::create('time_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->integer('hours');
+            $table->decimal('hours', 5, 2);
             $table->text('work_output')->nullable();
-            $table->date('date')->nullable(); // merged add_date_to_time_logs
+            $table->date('date')->nullable();
+            $table->enum('status', ['Pending', 'Approved', 'Declined'])->default('Pending');
+            $table->text('decline_reason')->nullable();
+            $table->time('time_in')->nullable();
+            $table->time('time_out')->nullable();
             $table->timestamps();
         });
 
-        /**
-         * Comments Table
-         */
         Schema::create('comments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
@@ -58,9 +51,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        /**
-         * Project Permissions Table
-         */
         Schema::create('project_permissions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');

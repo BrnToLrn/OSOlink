@@ -121,11 +121,6 @@
                                     @csrf
                                     <button type="submit" class="text-red-600 dark:text-red-400 hover:underline">Reject</button>
                                 </form>
-
-                                <form action="{{ route('leaves.pending', $leave) }}" method="POST" class="m-0">
-                                    @csrf
-                                    <button type="submit" class="text-yellow-600 dark:text-yellow-400 hover:underline">Pending</button>
-                                </form>
                             </div>
                         </td>
                     </tr>
