@@ -88,7 +88,6 @@
 
                         // Initialize start date if empty
                         if (!startInput.value) startInput.value = today;
-                        startInput.min = today;
 
                         // Helper to add days to a date string
                         function addDays(dateStr, days) {
