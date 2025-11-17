@@ -18,9 +18,13 @@
                             </p>
                         </div>
                         @if(auth()->user()->is_admin)
-                            <x-primary-button :href="route('projects.create')" as="a">
+                            <a href="{{ route('projects.create') }}"
+                                class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md 
+                                font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm 
+                                hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 
+                                focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
                                 New Project
-                            </x-primary-button>
+                            </a>
                         @endif
                     </header>
 
