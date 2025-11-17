@@ -32,6 +32,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('payslip_id')->nullable()->constrained('payslips')->onDelete('set null');
             $table->decimal('hours', 5, 2);
             $table->text('work_output')->nullable();
             $table->date('date')->nullable();

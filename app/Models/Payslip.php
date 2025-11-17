@@ -24,6 +24,7 @@ class Payslip extends Model
         'cash_loan_period_deduction',
         'net_pay',
         'is_paid',
+        'created_by', // allow assignment
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Payslip extends Model
         'cash_loan_period_deduction' => 'decimal:2',
         'net_pay'      => 'decimal:2',
         'is_paid'      => 'boolean',
+        'created_by'   => 'integer',
     ];
 
     protected $attributes = [
@@ -61,6 +63,11 @@ class Payslip extends Model
     public function adjustmentItems()
     {
         return $this->hasMany(\App\Models\Adjustment::class);
+    }
+
+    public function timeLogs()
+    {
+        return $this->hasMany(\App\Models\TimeLog::class);
     }
 
     public function setLoanInstallment(\App\Models\CashLoan $loan, int $periodNumber): self

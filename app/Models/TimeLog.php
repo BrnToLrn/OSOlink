@@ -43,6 +43,11 @@ class TimeLog extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function payslip()
+    {
+        return $this->belongsTo(\App\Models\Payslip::class);
+    }
+
     /**
      * Approve the time log.
      */
